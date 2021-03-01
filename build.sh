@@ -14,6 +14,13 @@ clang \
     -I ../code \
     -I ../lib/tco_libd/include \
     -I ../lib/tco_shmem \
+    -I /usr/lib/aarch64-linux-gnu/glib-2.0/include \
+	-I /usr/include/gstreamer-1.0 \
+	-I /usr/include/glib-2.0 \
+    -l gstreamer-1.0 \
+    -l glib-2.0 \
+	-l gobject-2.0 \
+    `pkg-config --cflags --libs gstreamer-1.0` \
     ../code/*.c \
     tco_libd.a \
     -o tco_pland.bin
