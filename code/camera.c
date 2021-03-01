@@ -4,7 +4,14 @@
 #include "tco_libd.h"
 #include "camera.h"
 
-void log_gst_version(void)
+/* NOTE: "format=YUY2" works but gives a warning about subscribing to the V4L2_EVENT_SOURCE_CHANGE etc... */
+static const gchar *pipeline_def =
+    "v4l2src device=/dev/video0 io-mode=dmabuf !"
+    "video/x-raw,width=640,height=480,framerate=30/1 !"
+    "queue max-size-buffers=1 leaky=downstream !"
+    "appsink name=appsink";
+
+static void log_gst_version(void)
 {
     const char *nano_str;
     guint major, minor, micro, nano;
@@ -99,45 +106,12 @@ int camera_pipeline_run(int argc, char *argv[], camera_user_data_t *user_data)
         return -1;
     }
 
-    GstElement *pipeline = gst_pipeline_new("camera-pipeline");
-    GstElement *camera_source = gst_element_factory_make("v4l2src", "camera-source");
-    GstElement *converter = gst_element_factory_make("videoconvert", "converter");
-    GstElement *queue_leaking = gst_element_factory_make("queue", "queue_leaking");
-    GstElement *appsink = gst_element_factory_make("appsink", "appsink");
-    if (!pipeline || !camera_source || !converter || !queue_leaking || !appsink)
+    GstElement *pipeline = gst_parse_launch(pipeline_def, NULL);
+    if (!pipeline)
     {
-        log_error("Failed to create one or more gstreamer elements");
+        log_error("Failed to create a gstreamer pipeline");
         return -1;
     }
-
-    /* Set fixed capabilities on the camera source. */
-    GstCaps *camera_caps = gst_caps_new_simple("video/x-raw",
-                                               "width", G_TYPE_INT, 1280,
-                                               "height", G_TYPE_INT, 960,
-                                               "format", G_TYPE_STRING, "I420",
-                                               "framerate", G_TYPE_STRING, "30/1",
-                                               NULL);
-    if (!camera_caps)
-    {
-        log_error("Failed to create a gstreamer caps");
-        return -1;
-    }
-
-    /* Set up the pipeline. */
-    /* Configure the Video4Linux source to read from the camera. */
-    g_object_set(G_OBJECT(camera_source), "device", "/dev/video0", NULL);
-
-    /* Setup a leaky queue. */
-    g_object_set(G_OBJECT(queue_leaking), "leaky", 2, NULL); /* 2 = downstream */
-    g_object_set(G_OBJECT(queue_leaking), "max-size-buffers", 1, NULL);
-
-    /* Add elements to pipeline. */
-    gst_bin_add_many(GST_BIN(pipeline), camera_source, converter, queue_leaking, appsink, NULL);
-
-    /* Link elements together to form the pipeline. */
-    gst_element_link_filtered(camera_source, converter, camera_caps); /* Fixed capabilities. */
-    gst_caps_unref(camera_caps);                                      /* Ensure it gets freed later on once the pipeline is freed */
-    gst_element_link_many(converter, queue_leaking, appsink, NULL);
 
     GstBus *bus = gst_element_get_bus(pipeline);
     if (!bus)
@@ -149,6 +123,7 @@ int camera_pipeline_run(int argc, char *argv[], camera_user_data_t *user_data)
     gst_object_unref(bus); /* Ensure it gets freed later on once the pipeline is freed */
 
     // Set up an appsink to pass frames to a user callback
+    GstElement *appsink = gst_bin_get_by_name((GstBin *)pipeline, "appsink");
     g_object_set(appsink, "emit-signals", TRUE, NULL);
     g_signal_connect(appsink, "new-sample", (GCallback)handle_new_sample, user_data);
 
