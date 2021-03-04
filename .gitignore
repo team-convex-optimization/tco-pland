@@ -3,3 +3,6 @@ build
 
 # Logger output
 log.txt
+
+# VSCode
+.vscode
