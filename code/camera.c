@@ -32,7 +32,7 @@ static const gchar *pipeline_camera_sim_def =
     "appsink name=appsink";
 
 static const gchar *pipeline_display_def =
-    "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=480,framerate=30/1 !"
+    "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=480 !"
     "queue max-size-buffers=1 leaky=downstream !"
     "videoconvert !"
     "autovideosink";
