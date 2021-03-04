@@ -11,7 +11,7 @@
 #include "tco_shmem.h"
 #include "camera.h"
 
-int log_level = LOG_INFO | LOG_DEBUG | LOG_ERROR;
+int log_level = LOG_INFO | LOG_ERROR;
 
 static struct tco_shmem_data_training *training_data;
 static sem_t *training_data_sem;
@@ -116,8 +116,8 @@ static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
     log_error("sem_wait: %s", strerror(errno));
     exit(EXIT_FAILURE);
   }
-  shmem_open = 1;
   /* START: Critical section */
+  shmem_open = 1;
   memcpy(pixel_dest, &(training_data->video), frame_size_expected);
   /* END: Critical section */
   if (sem_post(training_data_sem) == -1)
@@ -161,6 +161,7 @@ static void *thread_job_display_pipeline(void *arg)
 
 static void *thread_job_camera_sim_pipeline(void *arg)
 {
+  /* Mapping shmem inside here gives much better performance than mapping it in the main thread. */
   if (shmem_map(TCO_SHMEM_NAME_TRAINING, TCO_SHMEM_SIZE_TRAINING, TCO_SHMEM_NAME_SEM_TRAINING, O_RDONLY, (void **)&training_data, &training_data_sem) != 0)
   {
     log_error("Failed to map shared memory and associated semaphore");

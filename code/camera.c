@@ -269,7 +269,7 @@ int display_pipeline_run(camera_user_data_t *const user_data)
         return -1;
     }
 
-    /* Set up an appsrc to inject frame into pipeline from output of main pipeline which reads frames from the simulator. */
+    /* Set up an appsrc to inject frame into pipeline from output of simulator camera pipeline. */
     pipeline_display.app_source = gst_bin_get_by_name((GstBin *)pipeline_display.pipeline, "appsrc");
     g_object_set(pipeline_display.app_source, "emit-signals", TRUE, NULL);
     g_signal_connect(pipeline_display.app_source, "need-data", G_CALLBACK(start_feed), &pipeline_display);
