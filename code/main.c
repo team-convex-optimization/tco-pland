@@ -10,6 +10,7 @@
 #include "tco_libd.h"
 #include "tco_shmem.h"
 #include "camera.h"
+#include "trajection.h"
 
 int log_level = LOG_INFO | LOG_ERROR;
 
@@ -19,7 +20,7 @@ static uint8_t shmem_open = 0; /* To ensure that semaphor is never left at 0 whe
 static uint32_t frame_size_expected = TCO_SIM_WIDTH * TCO_SIM_HEIGHT * sizeof(uint8_t);
 
 static pthread_mutex_t frame_processed_mutex;
-static uint8_t frame_processed[TCO_SIM_WIDTH][TCO_SIM_HEIGHT] = {0}; /* This will be accessed by multiple threads. */
+static uint8_t frame_processed[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {0}; /* This will be accessed by multiple threads. */
 
 static uint8_t using_threads = 0;
 static pthread_t thread_display = {0};
@@ -86,10 +87,11 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
     log_error("The expected frame size and actual frame size do not match");
     exit(EXIT_FAILURE);
   }
-  uint8_t frame_processed_tmp[TCO_SIM_WIDTH][TCO_SIM_HEIGHT] = {0};
+  uint8_t frame_processed_tmp[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]= {0};
   memcpy(&frame_processed_tmp, &pixels, frame_size_expected);
-
+  
   /* Process image here by modifying "frame_processed_tmp". */
+  convert_threshold(&frame_processed_tmp);
 
   if (pthread_mutex_lock(&frame_processed_mutex) != 0)
   {
