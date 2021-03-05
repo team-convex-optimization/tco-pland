@@ -98,7 +98,7 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
     log_error("Failed to lock mutex for accessing processed frame data inside 'frame_raw_processor'");
     exit(EXIT_FAILURE);
   }
-  memcpy(&frame_processed_tmp, &frame_processed, frame_size_expected);
+  memcpy(&frame_processed, &frame_processed_tmp, frame_size_expected);
   if (pthread_mutex_unlock(&frame_processed_mutex) != 0)
   {
     log_error("Failed to unlock mutex for accessing processed frame data inside 'frame_raw_processor'");
