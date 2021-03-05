@@ -11,7 +11,6 @@ pushd build
 clang \
     -Wall \
     -std=c11 \
-    -g \
     -I ../code \
     -I ../lib/tco_libd/include \
     -I ../lib/tco_shmem \

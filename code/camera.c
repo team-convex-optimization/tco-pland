@@ -73,7 +73,6 @@ static gboolean push_data(gst_pipeline_t *pipeline_info)
     /* Create a new empty buffer */
     buffer = gst_buffer_new_and_alloc(frame_size);
 
-    /* Generate some psychodelic waveforms */
     gst_buffer_map(buffer, &map, GST_MAP_WRITE);
     frame_raw = map.data;
     pipeline_info->user_data->frame_injector_data.func(frame_raw, frame_size, pipeline_info->user_data->frame_injector_data.args);
