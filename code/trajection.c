@@ -15,10 +15,10 @@ uint8_t find_row_threshold(uint8_t* imrow)
     return gradient;
 }
 
-void find_row_edges(uint8_t* imrow, uint8_t edges[2]) //edges is 2
+void find_row_edges(uint8_t* imrow, uint16_t* edges) //edges is 2
 {
     /* Go center to left/right and look for biggest change */
-    uint8_t edge_l, edge_r, tempContrast = 0;
+    uint16_t edge_l, edge_r, tempContrast = 0;
 
     /* Find Left edge */
     for (int i = IMAGE_CENTER; i > 1; i--) 
@@ -70,6 +70,39 @@ void convert_threshold(uint8_t* im) {
  * @param im a collection of grayscale pixels in format in format WIDTHxHEIGHT
  * @return void. the image is returned throught the pointer reference.
 */
-void convert_scatter(image* im){  
-      return; /* TODO : implement me */
+void convert_scatter(uint8_t* im){  
+    for (int i = 0; i < TCO_SIM_HEIGHT; i++) 
+    {
+        uint8_t *row = &im[i*TCO_SIM_WIDTH];
+        uint16_t edges[2]; 
+        find_row_edges(row, (uint16_t*)&edges);
+        /* Paint the edges white */
+        for (uint16_t j = 0; j < TCO_SIM_WIDTH; j++) 
+        {
+            row[j] = (j == edges[0] || j == edges[1]) ? 255 : 0;
+        }
+    }
+}
+
+/** K nearest gradient track-center search
+ * @brief todo
+ * @param im is a collection of pixels with values 255 OR 0. That is, it is B&W.
+ * @param k is the number of neighbors to look at when finding slope.
+ * @return todo
+*/
+void k_nearest_neighbor_gradient_center(uint8_t* im, uint8_t k) {
+    uint16_t neighbors[k][2]; /* This represents the start and end of the track at that row */
+    //Find track edges
+
+    //Find center using gradient
+    for (int i = 0; i < TCO_SIM_HEIGHT; i++) 
+    {
+        uint8_t *row = &im[i*TCO_SIM_WIDTH];
+        uint8_t thresh = find_row_threshold(row);
+        for (int j = 0; j < TCO_SIM_WIDTH; j++) 
+        {
+            row[j] = (row[j] < thresh) ? 255 : 0;
+        }
+    }
+
 }

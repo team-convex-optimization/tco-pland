@@ -39,7 +39,7 @@ uint8_t find_row_threshold(uint8_t* imrow);
  * @param edges should be a reference to a 2x1 byte array of where the result of edge_l and edge_r should be placed. 
  *              Each edge is the number of pixels from the left where the edge is on the row
 */
-void find_row_edges(uint8_t* im, uint8_t edges[2]);
+void find_row_edges(uint8_t* im, uint16_t *edges);
 
 
 /*****************************************************
@@ -58,7 +58,7 @@ void convert_threshold(uint8_t* im);
  * @param im a collection of grayscale pixels in format in format WIDTHxHEIGHT
  * @return void. the image is returned throught the pointer reference.
 */
-void convert_scatter(image* im);
+void convert_scatter(uint8_t* im);
 
 
 #endif /* _TRAJECTION_H_ */
