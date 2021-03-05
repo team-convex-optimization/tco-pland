@@ -60,5 +60,8 @@ void convert_threshold(uint8_t* im);
 */
 void convert_scatter(uint8_t* im);
 
+void k_nearest_neighbor_gradient_center(uint8_t* im, uint8_t k);
+
+
 
 #endif /* _TRAJECTION_H_ */

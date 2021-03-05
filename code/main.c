@@ -72,7 +72,8 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
 
   /* Process image here by modifying "frame_processed_tmp". */
   convert_threshold((uint8_t*)&frame_processed_tmp);
-  // convert_scatter((uint8_t*)&frame_processed_tmp); 
+  k_nearest_neighbor_gradient_center((uint8_t*)&frame_processed_tmp, 3);
+
 
   if (pthread_mutex_lock(&frame_processed_mutex) != 0)
   {
