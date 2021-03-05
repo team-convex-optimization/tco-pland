@@ -16,8 +16,9 @@
 #include "tco_libd.h"
 
 /*****************************************************
- ****************** Hyperparamaters ******************
+ *************** Important definitions ***************
  ****************************************************/
+typedef uint8_t image[TCO_SIM_HEIGHT][TCO_SIM_WIDTH];
 #define IMAGE_CENTER TCO_SIM_WIDTH/2
 
 /*****************************************************
@@ -50,14 +51,14 @@ void find_row_edges(uint8_t* im, uint8_t edges[2]);
  * @param im a collection of grayscale pixels in format in format WIDTHxHEIGHT
  * @return void. the image is returned throught the pointer reference.
 */
-void convert_threshold(uint8_t im[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
+void convert_threshold(image* im);
 
 /** Edge Detection
  * @brief Return where each row is black (255) if it is an edge, else, white (0)
  * @param im a collection of grayscale pixels in format in format WIDTHxHEIGHT
  * @return void. the image is returned throught the pointer reference.
 */
-void convert_scatter(uint8_t im[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
+void convert_scatter(image* im);
 
 
 #endif /* _TRAJECTION_H_ */
