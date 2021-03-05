@@ -51,7 +51,7 @@ void find_row_edges(uint8_t* im, uint8_t edges[2]);
  * @param im a collection of grayscale pixels in format in format WIDTHxHEIGHT
  * @return void. the image is returned throught the pointer reference.
 */
-void convert_threshold(image* im);
+void convert_threshold(uint8_t* im);
 
 /** Edge Detection
  * @brief Return where each row is black (255) if it is an edge, else, white (0)

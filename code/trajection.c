@@ -53,13 +53,14 @@ void find_row_edges(uint8_t* imrow, uint8_t edges[2]) //edges is 2
  * @param im a collection of grayscale pixels in format in format WIDTHxHEIGHT
  * @return void. the image is returned throught the pointer reference.
 */
-void convert_threshold(image* im) {
+void convert_threshold(uint8_t* im) {
     for (int i = 0; i < TCO_SIM_HEIGHT; i++) 
     {
-        uint8_t thresh = find_row_threshold((uint8_t *)im[i]);
+        uint8_t *row = &im[i*TCO_SIM_WIDTH];
+        uint8_t thresh = find_row_threshold(row);
         for (int j = 0; j < TCO_SIM_WIDTH; j++) 
         {
-            *im[i][j] = (*im[i][j] < thresh) ? 255 : 0;
+            row[j] = (row[j] < thresh) ? 255 : 0;
         }
     }
 }

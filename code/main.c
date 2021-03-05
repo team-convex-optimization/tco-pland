@@ -71,7 +71,7 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
   memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
   /* Process image here by modifying "frame_processed_tmp". */
-  convert_threshold((uint8_t (*)[480][640])&frame_processed_tmp);
+  convert_threshold((uint8_t*)&frame_processed_tmp);
 
   if (pthread_mutex_lock(&frame_processed_mutex) != 0)
   {
