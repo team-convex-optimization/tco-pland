@@ -15,11 +15,11 @@
 
 /* A user defined function which received pointer to frame data and does anything it wants with it.
 */
-typedef struct proc_func_t
+typedef struct user_proc_func_t
 {
     void (*f)(uint8_t *, int, void *);
     void *args;
-} proc_func_t;
+} user_proc_func_t;
 
 static struct tco_shmem_data_training *training_data;
 static sem_t *training_data_sem;
@@ -35,7 +35,7 @@ static uint8_t using_threads = 0;
 static pthread_t thread_display = {0};
 static pthread_t thread_camera_sim = {0};
 static atomic_char exit_requested = 0; /* Gets written by all children threads and gets read in the main thread. */
-static proc_func_t user_proc_func;
+static user_proc_func_t user_proc_func;
 
 /**
  * @brief This method is used as a handler for various basic signals. It does not do much but it
@@ -108,7 +108,7 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
     /* Process image here by modifying 'frame_processed_tmp'. */
-    proc_func_t *user_proc_func = args_ptr;
+    user_proc_func_t *user_proc_func = args_ptr;
     user_proc_func->f((uint8_t *)&frame_processed_tmp, frame_size_expected, user_proc_func->args);
 
     if (pthread_mutex_lock(&frame_processed_mutex) != 0)
@@ -220,7 +220,7 @@ static void *thread_job_display_pipeline(void *args)
  */
 static void *thread_job_camera_sim_pipeline(void *args)
 {
-    proc_func_t *user_proc_func = args; /* Show what the arg pointer is explicitly. */
+    user_proc_func_t *user_proc_func = args; /* Show what the arg pointer is explicitly. */
     camera_user_data_t user_data_camera_sim = {{&frame_raw_processor, user_proc_func}, {&frame_raw_injector, NULL}};
     if (camera_sim_pipeline_run(&user_data_camera_sim) != 0)
     {
@@ -302,8 +302,9 @@ static void detect_and_handle_exit_requested(void)
  */
 static int compute_run_camera_real(void (*proc_func)(uint8_t *, int, void *), void *proc_func_args)
 {
-    /* TODO: Fill in the injector and processor function pointers. */
-    camera_user_data_t user_data = {{NULL, NULL}, {NULL, NULL}};
+    user_proc_func.f = proc_func;
+    user_proc_func.args = proc_func_args;
+    camera_user_data_t user_data = {{frame_raw_processor, &user_proc_func}, {NULL, NULL}};
     if (camera_pipeline_run(&user_data) != 0)
     {
         log_error("Failed to run the camera pipeline");
