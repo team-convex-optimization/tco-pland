@@ -176,8 +176,8 @@ static void handle_bus_msg_error(GstBus *bus, GstMessage *msg, gst_pipeline_t *p
 
     /* Print error details on the screen */
     gst_message_parse_error(msg, &err, &debug_info);
-    log_error("BUS: Error received from element %s: %s\n", GST_OBJECT_NAME(msg->src), err->message);
-    log_error("BUS: Debugging information: %s\n", debug_info ? debug_info : "none");
+    log_error("BUS: Error received from element %s: %s", GST_OBJECT_NAME(msg->src), err->message);
+    log_error("BUS: Debugging information: %s", debug_info ? debug_info : "none");
     g_clear_error(&err);
     g_free(debug_info);
 
