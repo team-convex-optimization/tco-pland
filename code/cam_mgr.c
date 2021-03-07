@@ -20,7 +20,7 @@ typedef struct compute_user_data_t
 {
     void (*f)(uint8_t *, int, void *);
     void *args;
-    clock_t frame_end_times[2]; /* Hold times measured at end of a frame. */
+    struct timespec frame_end_times[2]; /* Hold times measured at end of a frame. */
 } compute_user_data_t;
 
 static struct tco_shmem_data_training *training_data;
@@ -153,7 +153,7 @@ static void frame_draw_number(uint8_t *const pixels, uint16_t const number, uint
     }
 
     uint8_t const white = 255;
-    uint32_t row_start_idx = start_y * TCO_SIM_WIDTH;
+    uint32_t row_start_idx = (start_y * TCO_SIM_WIDTH) + start_x;
     for (uint8_t pixel_idx_y = 0; pixel_idx_y < digit_height; pixel_idx_y++)
     {
         for (uint8_t scanline_idx = 0; scanline_idx < digit_scale; scanline_idx++)
@@ -222,7 +222,7 @@ static void frame_test_injector(uint8_t *pixel_dest, int length, void *args_ptr)
 static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
 {
     static uint16_t fps_now = 0;
-    static clock_t fps_counter = 0; /* Number of frames that passed since last FPS log. */
+    static uint16_t fps_counter = 0; /* Number of frames that passed in the current second. */
 
     if (frame_size_expected != length)
     {
@@ -241,21 +241,23 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
     compute_user_data->f((uint8_t *)&frame_processed_tmp, frame_size_expected, compute_user_data->args);
 
     /* Measure FPS. */
-    frame_draw_number((uint8_t *)&frame_processed_tmp, fps_now, 20, 20);
+    frame_draw_number((uint8_t *)&frame_processed_tmp, fps_now, 10, 10);
     if (fps_counter == 0)
     {
-        compute_user_data->frame_end_times[0] = clock();
+        clock_gettime(CLOCK_REALTIME, &compute_user_data->frame_end_times[0]);
     }
     else
     {
-        compute_user_data->frame_end_times[1] = clock();
+        clock_gettime(CLOCK_REALTIME, &compute_user_data->frame_end_times[1]);
     }
-    clock_t delta_time = compute_user_data->frame_end_times[1] - compute_user_data->frame_end_times[0];
-    if (fps_counter > 0 && delta_time >= CLOCKS_PER_SEC)
+    /* Delta is calculated assuming the seconds fields are 0 which they should be in 1 frame. */
+    static uint64_t const nanos_in_sec = 1000000000;
+    struct timespec const delta_time = {0, compute_user_data->frame_end_times[1].tv_nsec - compute_user_data->frame_end_times[0].tv_nsec};
+    if (fps_counter > 0 && delta_time.tv_nsec >= nanos_in_sec)
     {
         fps_now = fps_counter;
-        compute_user_data->frame_end_times[0] = 0;
-        compute_user_data->frame_end_times[1] = 0;
+        memset(&compute_user_data->frame_end_times[0], 0, sizeof(struct timespec));
+        memset(&compute_user_data->frame_end_times[1], 0, sizeof(struct timespec));
         fps_counter = 0;
         log_debug("fps: %u", fps_now);
     }
@@ -296,6 +298,8 @@ static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
         atomic_store(&exit_requested, 1);
         exit(EXIT_FAILURE);
     }
+    struct timespec time_start, time_end;
+    clock_gettime(CLOCK_REALTIME, &time_start);
 
     if (sem_wait(training_data_sem) == -1)
     {
@@ -312,6 +316,15 @@ static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
         exit(EXIT_FAILURE);
     }
     shmem_open = 0;
+    clock_gettime(CLOCK_REALTIME, &time_end);
+
+    /* Simulate the real camera by outputing a constant 30 fps. */
+    static uint64_t const time_delta_expected = 33333333;                                                  /* 1/30 seconds. */
+    struct timespec const time_delta = {0, time_delta_expected - (time_end.tv_nsec - time_start.tv_nsec)}; /* Seconds are assumed to be 0 i.e. each frame takes less than 1 second. */
+    if (time_delta.tv_nsec > 0)
+    {
+        nanosleep(&time_delta, NULL);
+    }
 }
 
 /**
@@ -408,7 +421,7 @@ static void register_signal_handler(void)
 static void detect_and_handle_exit_requested(void)
 {
     /* 100ms but not exactly due to granularity of the clock hence the 'rem' pointer passed to
-  'nanosleep' */
+    'nanosleep' */
     struct timespec const req = {0, 100000000};
     struct timespec rem;
 
