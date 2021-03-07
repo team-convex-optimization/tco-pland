@@ -1,5 +1,5 @@
-#ifndef _CAMERA_H_
-#define _CAMERA_H_
+#ifndef _CAM_H_
+#define _CAM_H_
 
 #include <stdint.h>
 
@@ -15,11 +15,11 @@ typedef struct frame_injector_t
     void *args;
 } frame_injector_t;
 
-typedef struct camera_user_data_t
+typedef struct cam_user_data_t
 {
     frame_processor_t frame_processor_data;
     frame_injector_t frame_injector_data;
-} camera_user_data_t;
+} cam_user_data_t;
 
 /**
  * @brief Run the 'camera pipeline' which takes frames from the real camera and passes them onto the
@@ -28,7 +28,7 @@ typedef struct camera_user_data_t
  * @note The frame injector definition passed in user data to this function will be ignored.
  * @return 0 on success and -1 on failure.
  */
-int camera_pipeline_run(camera_user_data_t *const user_data);
+int cam_pipeline_run(cam_user_data_t *const user_data);
 
 /**
  * @brief Run the 'simulator camera pipeline' which takes raw frames from the simulator (by reading
@@ -38,7 +38,7 @@ int camera_pipeline_run(camera_user_data_t *const user_data);
  * frame injector which will acquire the frames and 'inject' them into the pipeline..
  * @return 0 on success and -1 on failure.
  */
-int camera_sim_pipeline_run(camera_user_data_t *const user_data);
+int cam_sim_pipeline_run(cam_user_data_t *const user_data);
 
 /**
  * @brief Run the 'display pipeline' which takes processed frames which were output from the user
@@ -48,6 +48,6 @@ int camera_sim_pipeline_run(camera_user_data_t *const user_data);
  * @note The frame processor definition passed in user data to this function will be ignored.
  * @return 0 on success and -1 on failure.
  */
-int display_pipeline_run(camera_user_data_t *const user_data);
+int cam_display_pipeline_run(cam_user_data_t *const user_data);
 
-#endif /* _CAMERA_H_ */
+#endif /* _CAM_MGR_H_ */

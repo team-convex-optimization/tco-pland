@@ -5,14 +5,14 @@
 
 #include "tco_libd.h"
 #include "tco_shmem.h"
-#include "camera.h"
+#include "cam.h"
 
 typedef struct gst_pipeline_t
 {
     GMainLoop *loop;
     GstElement *pipeline, *app_source;
     guint source_id; /* To control the GSource. */
-    camera_user_data_t *user_data;
+    cam_user_data_t *user_data;
 } gst_pipeline_t;
 
 static gst_pipeline_t pipeline_main = {NULL, NULL, NULL};
@@ -148,7 +148,7 @@ static GstFlowReturn handle_new_sample(GstElement *sink, gst_pipeline_t *pipelin
         if (gst_buffer_map(buf, &info, GST_MAP_READ) == TRUE)
         {
             /* Pass the frame to the user callback. */
-            camera_user_data_t *user_data = (camera_user_data_t *)pipeline_info->user_data;
+            cam_user_data_t *user_data = (cam_user_data_t *)pipeline_info->user_data;
             user_data->frame_processor_data.func(info.data + 1, info.size, user_data->frame_processor_data.args);
         }
         else
@@ -193,6 +193,11 @@ static void handle_bus_msg_error(GstBus *bus, GstMessage *msg, gst_pipeline_t *p
  */
 static int common_pipeline_init(gst_pipeline_t *pipeline_info, const gchar *pipeline_definition)
 {
+    /* Make sure the struct is zerod out (apart from the user data). */
+    void *const user_data = pipeline_info->user_data;
+    memset(pipeline_info, 0, sizeof(gst_pipeline_t));
+    pipeline_info->user_data = user_data;
+
     /* Initialisation */
     gst_init(NULL, NULL);
     log_gst_version();
@@ -217,6 +222,7 @@ static int common_pipeline_init(gst_pipeline_t *pipeline_info, const gchar *pipe
     gst_bus_add_signal_watch(bus);
     g_signal_connect(G_OBJECT(bus), "message::error", (GCallback)handle_bus_msg_error, pipeline_info);
     gst_object_unref(bus); /* Ensure it gets freed later on once the pipeline is freed */
+
     return 0;
 }
 
@@ -251,7 +257,7 @@ static int common_pipeline_start_and_cleanup(gst_pipeline_t *pipeline_info)
     return 0;
 }
 
-int camera_pipeline_run(camera_user_data_t *const user_data)
+int cam_pipeline_run(cam_user_data_t *const user_data)
 {
     pipeline_main.user_data = user_data;
     if (common_pipeline_init(&pipeline_main, pipeline_camera_def) != 0)
@@ -273,7 +279,7 @@ int camera_pipeline_run(camera_user_data_t *const user_data)
     return 0;
 }
 
-int camera_sim_pipeline_run(camera_user_data_t *const user_data)
+int cam_sim_pipeline_run(cam_user_data_t *const user_data)
 {
     pipeline_main.user_data = user_data;
     if (common_pipeline_init(&pipeline_main, pipeline_camera_sim_def) != 0)
@@ -301,7 +307,7 @@ int camera_sim_pipeline_run(camera_user_data_t *const user_data)
     return 0;
 }
 
-int display_pipeline_run(camera_user_data_t *const user_data)
+int cam_display_pipeline_run(cam_user_data_t *const user_data)
 {
     pipeline_display.user_data = user_data;
     if (common_pipeline_init(&pipeline_display, pipeline_display_def) != 0)

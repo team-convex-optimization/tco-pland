@@ -5,7 +5,7 @@
 
 #include "tco_libd.h"
 #include "tco_shmem.h"
-#include "compute.h"
+#include "cam_mgr.h"
 
 int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 
@@ -23,10 +23,10 @@ int main(int argc, char *argv[])
 
   if (argc == 2 && (strcmp(argv[1], "--sandbox") == 0 || strcmp(argv[1], "-s") == 0))
   {
-    return compute_run(0, &proc_func, NULL);
+    return cam_mgr_run(0, &proc_func, NULL);
   }
   else
   {
-    return compute_run(1, &proc_func, NULL);
+    return cam_mgr_run(1, &proc_func, NULL);
   }
 }
