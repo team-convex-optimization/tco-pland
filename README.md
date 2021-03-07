@@ -6,4 +6,5 @@ reads on its own.
 - libglib2.0-dev (also contains libgobject-2.0-dev)
 - libgstreamer1.0-dev
 - gstreamer1.0-plugins-base (contains 'appsink' and 'appsrc')
+- gstreamer1.0-plugins-good (contains 'v4l2src')
 - pthread

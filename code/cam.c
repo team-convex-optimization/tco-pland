@@ -19,16 +19,17 @@ static gst_pipeline_t pipeline_main = {NULL, NULL, NULL};
 static gst_pipeline_t pipeline_display = {NULL, NULL, NULL};
 
 static const gchar *pipeline_camera_def =
-    "v4l2src device=/dev/video0 io-mode=dmabuf !"
-    "video/x-raw,width=640,height=480,framerate=30/1,format=I420 !"
+    "v4l2src device=/dev/video0 !"
+    "video/x-raw,format=YUY2,width=640,height=480,framerate=30/1 !"
     "queue max-size-buffers=1 leaky=downstream !"
-    "appsink name=appsink";
+    "videoconvert !"
+    "appsink name=appsink caps=video/x-raw,format=GRAY8,width=640,height=480";
 
 static const gchar *pipeline_camera_sim_def =
     "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=480 !"
     "queue max-size-buffers=1 leaky=downstream !"
     "videoconvert !"
-    "appsink name=appsink";
+    "appsink name=appsink caps=video/x-raw,format=GRAY8,width=640,height=480";
 
 static const gchar *pipeline_display_def =
     "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=480 !"
@@ -269,7 +270,7 @@ int cam_pipeline_run(cam_user_data_t *const user_data)
     /* Set up an appsink to pass frames to a user callback */
     GstElement *appsink = gst_bin_get_by_name((GstBin *)pipeline_main.pipeline, "appsink");
     g_object_set(appsink, "emit-signals", TRUE, NULL);
-    g_signal_connect(appsink, "new-sample", (GCallback)handle_new_sample, pipeline_main.user_data);
+    g_signal_connect(appsink, "new-sample", (GCallback)handle_new_sample, &pipeline_main);
 
     if (common_pipeline_start_and_cleanup(&pipeline_main) != 0)
     {

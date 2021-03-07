@@ -30,7 +30,7 @@ static uint32_t const frame_size_expected = TCO_SIM_WIDTH * TCO_SIM_HEIGHT * siz
 
 /* This will be accessed by multiple threads. The alignment is there to avoid problems when using
 memcpy with this address. */
-static uint8_t __attribute__((aligned(32))) frame_processed[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {0};
+static uint8_t __attribute__((aligned(32))) frame_processed[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {{0}};
 static pthread_mutex_t frame_processed_mutex;
 
 static uint8_t using_threads = 0;
@@ -233,7 +233,7 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
     /* This is an array which holds a copy of the processed frame. This is done because nothing can
     be guaranteed about the 'pixels' pointer (it could even be read-only). Needs to be aligned in
     order for memcpy to be used. */
-    uint8_t __attribute__((aligned(32))) frame_processed_tmp[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {0};
+    uint8_t __attribute__((aligned(32))) frame_processed_tmp[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {{0}};
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
     /* Process image here by modifying 'frame_processed_tmp'. */
