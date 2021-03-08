@@ -20,46 +20,73 @@ int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 static struct tco_shmem_data_training *training_data;
 static sem_t *training_data_sem;
 static uint8_t shmem_open = 0; /* To ensure that semaphor is never left at 0 when forcing the app to exit. */
-static uint32_t frame_size_expected = TCO_SIM_WIDTH * TCO_SIM_HEIGHT * sizeof(uint8_t);
+static uint32_t const frame_size_expected = TCO_SIM_WIDTH * TCO_SIM_HEIGHT * sizeof(uint8_t);
 
+/* This will be accessed by multiple threads. The alignment is there to avoid problems when using memcpy with this address. */
+static uint8_t __attribute__((aligned(32))) frame_processed[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {0};
 static pthread_mutex_t frame_processed_mutex;
-static uint8_t __attribute__((aligned(32))) frame_processed[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {0}; /* This will be accessed by multiple threads. */
 
 static uint8_t using_threads = 0;
 static pthread_t thread_display = {0};
 static pthread_t thread_camera_sim = {0};
-static atomic_char exit_requested = 0; /*  */
+static atomic_char exit_requested = 0; /* Gets written by all pthreads and gets read in the main thread. */
 
+/**
+ * @brief This method is used as a handler for various basic signals. It does not do much but it 
+ * ensures that the main thread which polls the 'exit_requested' variable, known that it should 
+ * cleanup and exit.
+ * @param sig Signal that has occured and which needs to be handled.
+ */
 static void handle_signals(int sig)
 {
   /* TODO: Not all signals should just quit. */
   atomic_store(&exit_requested, 1);
 }
 
-/* Inject a diagonally scrolling grayscale gradient. */
+/**
+ * @brief Inject a diagonally scrolling grayscale gradient to the destination pointer.
+ * @param pixel_dest Where the frame will be written.
+ * @param length The length of the 'pixel_dest' array in bytes.
+ * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
+ */
 static void frame_test_injector(uint8_t *pixel_dest, int length, void *args_ptr)
 {
-  static float offset = 0.0;
+  static float offset = 0.0;           /* Offset of the gradient along the diagonal as a fraction of the diagonal length. */
+  const float pix_val_white = 255.0f;  /* 0=black, 255=white. */
+  const float speed_scrolling = 0.01f; /* As a fraction of the diagonal length per frame. */
   float pix_offset;
-  for (uint16_t y = 0; y < 480; y++)
+  for (uint16_t y = 0; y < TCO_SIM_HEIGHT; y++)
   {
-    for (uint16_t x = 0; x < 640; x++)
+    for (uint16_t x = 0; x < TCO_SIM_WIDTH; x++)
     {
-      pix_offset = (((x / 640.0) + (y / 480.0)) / 2) + offset;
+      /* Fraction from upper left corner along the diagonal (1 = bottom right corner, 0 = top left corner). */
+      pix_offset = ((x / TCO_SIM_WIDTH) + (y / TCO_SIM_HEIGHT)) / 2;
+      /* An offset is in the range of [0..1] where at 0 upper left corner is all black and gradient 
+      moves diagonally until white in the bottom right. Offset equal to 1 means the upper left 
+      corner is white and bottom right corner is black. */
+      pix_offset += offset;
       if (pix_offset > 1.0f)
       {
         pix_offset -= 1.0f;
       }
-      pixel_dest[x + (y * 640)] = (int)(pix_offset * 255.0);
+      pixel_dest[x + (y * TCO_SIM_WIDTH)] = (int)(pix_offset * pix_val_white);
     }
   }
-  offset += 0.01;
+  offset += speed_scrolling;
   if (offset > 1.0f)
   {
     offset -= 1.0f;
   }
 }
 
+/**
+ * @brief Receives pixels and does processing on them. This is the function which a user should 
+ * modify to perform processing on a frame.
+ * @param pixels The pointer to the raw grayscale frame received from the video pipeline. This is 
+ * guaranteed to be a 2D array whose size is TCO_SIM_WIDTH by TCO_SIM_HEIGHT.
+ * @param length The size of the pixels array in bytes.
+ * @param args_ptr Pointer to user data in particular the 'frame_processor_t' args field.
+ */
 static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
 {
   if (frame_size_expected != length)
@@ -68,13 +95,15 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
     atomic_store(&exit_requested, 1);
     exit(EXIT_FAILURE);
   }
+  /* This is an array which holds a copy of the processed frame. This is done because nothing can 
+  be guaranteed about the 'pixels' pointer (it could even be read-only). Needs to be aligned in 
+  order for memcpy to be used. */
   uint8_t __attribute__((aligned(32))) frame_processed_tmp[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {0};
   memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
-  /* Process image here by modifying "frame_processed_tmp". */
-  convert_threshold((uint8_t*)&frame_processed_tmp);
-  k_nearest_neighbor_gradient_center((uint8_t*)&frame_processed_tmp, 3);
-
+  /* Process image here by modifying 'frame_processed_tmp'. */
+  convert_threshold((uint8_t *)&frame_processed_tmp);
+  k_nearest_neighbor_gradient_center((uint8_t *)&frame_processed_tmp, 3);
 
   if (pthread_mutex_lock(&frame_processed_mutex) != 0)
   {
@@ -93,6 +122,13 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
   }
 }
 
+/**
+ * @brief Reads a frame from the simulator written shared memory and writes them to the pixel 
+ * destination pointer.
+ * @param pixel_dest The location where the frame will be written.
+ * @param length The size of the pixels array in bytes.
+ * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
+ */
 static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
 {
   if (frame_size_expected != length)
@@ -101,16 +137,15 @@ static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
     atomic_store(&exit_requested, 1);
     exit(EXIT_FAILURE);
   }
+
   if (sem_wait(training_data_sem) == -1)
   {
     log_error("sem_wait: %s", strerror(errno));
     atomic_store(&exit_requested, 1);
     exit(EXIT_FAILURE);
   }
-  /* START: Critical section */
   shmem_open = 1;
   memcpy(pixel_dest, &(training_data->video), frame_size_expected);
-  /* END: Critical section */
   if (sem_post(training_data_sem) == -1)
   {
     log_error("sem_post: %s", strerror(errno));
@@ -120,6 +155,12 @@ static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
   shmem_open = 0;
 }
 
+/**
+ * @brief Reads the processed simulator frame data and writes it to the pixel destination pointer.
+ * @param pixel_dest The location where the frame will be written.
+ * @param length The size of the pixels array in bytes.
+ * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
+ */
 static void frame_processed_injector(uint8_t *pixel_dest, int length, void *args_ptr)
 {
   if (frame_size_expected != length)
@@ -128,6 +169,9 @@ static void frame_processed_injector(uint8_t *pixel_dest, int length, void *args
     atomic_store(&exit_requested, 1);
     exit(EXIT_FAILURE);
   }
+
+  /* Reading from the 'frame_processed' array is meant to be done by any thread hence to allow 
+  inconsistencies, in order to read the contents, a mutex must be locked. */
   if (pthread_mutex_lock(&frame_processed_mutex) != 0)
   {
     log_error("pthread_mutex_lock: %s", strerror(errno));
@@ -145,7 +189,12 @@ static void frame_processed_injector(uint8_t *pixel_dest, int length, void *args
   }
 }
 
-static void *thread_job_display_pipeline(void *arg)
+/**
+ * @brief A function which is meant to be run by a child thread and run the display pipeline i.e. 
+ * the pipeline which reads the processsed simulator frame and displays it on screen in a window.
+ * @param arg Pointer to user data passed to this job.
+ */
+static void *thread_job_display_pipeline(void *args)
 {
   camera_user_data_t user_data_display = {{NULL, NULL}, {&frame_processed_injector, NULL}};
   if (display_pipeline_run(&user_data_display) != 0)
@@ -157,7 +206,13 @@ static void *thread_job_display_pipeline(void *arg)
   return NULL;
 }
 
-static void *thread_job_camera_sim_pipeline(void *arg)
+/**
+ * @brief A function which is meant to be run by a child thread and run the simulator camera 
+ * pipeline i.e. the pipeline which reads raw frames from the shared memory where the simulator 
+ * writes its frame, then passes this data to a user controlled processing function.
+ * @param arg Pointer to user data passed to this job.
+ */
+static void *thread_job_camera_sim_pipeline(void *args)
 {
   camera_user_data_t user_data_camera_sim = {{&frame_raw_processor, NULL}, {&frame_raw_injector, NULL}};
   if (camera_sim_pipeline_run(&user_data_camera_sim) != 0)
@@ -169,6 +224,9 @@ static void *thread_job_camera_sim_pipeline(void *arg)
   return NULL;
 }
 
+/**
+ * @brief A helped function which registers the signal handler for all common signals.
+ */
 static void register_signal_handler(void)
 {
   struct sigaction sa;
@@ -179,9 +237,19 @@ static void register_signal_handler(void)
   sigaction(SIGTERM, &sa, NULL);
 }
 
+/**
+ * @brief It handles the situation where any of the threads request that the application exits. 
+ * Before exitting, this function will ensure that all necessary cleanup is done e.g. posting the 
+ * shmem access semaphore to avoid deadlocking the other processes which depend on the semaphore 
+ * to work as expected.
+ * @note This function should be called once all children threads are created but where the main 
+ * thead is not joined to any of the children threads.
+ */
 static void detect_and_handle_exit_requested(void)
 {
-  struct timespec const req = {0, 100000000}; /* 100ms but not exactly due to granularity of the clock hence the 'rem' pointer passed to 'nanosleep' */
+  /* 100ms but not exactly due to granularity of the clock hence the 'rem' pointer passed to 
+  'nanosleep' */
+  struct timespec const req = {0, 100000000};
   struct timespec rem;
 
   while (!atomic_load(&exit_requested))
@@ -223,15 +291,31 @@ int main(int argc, char *argv[])
     printf("Failed to initialize the logger\n");
     return EXIT_FAILURE;
   }
+
   if (argc == 2 && (strcmp(argv[1], "--sandbox") == 0 || strcmp(argv[1], "-s") == 0))
   {
+    /* Run the pipeline which reads simulated camera data from 'tco_sim' and processes it using 
+    the function as it would when running the real camera pipeline. 
+
+    Since it is useful to see what is going on when testing, a second pipeline must also be 
+    running which displays the processed franes. To do achieve this, 2 new children threads are 
+    created, one running the pipeline which reads camera data and passes it onto the processing 
+    function, and another which reads the output of the processing function and displays the 
+    resulting frame in a window. */
     using_threads = 1;
     register_signal_handler();
 
     atomic_init(&exit_requested, 0);
 
     shmem_open = 1;
-    if (shmem_map(TCO_SHMEM_NAME_TRAINING, TCO_SHMEM_SIZE_TRAINING, TCO_SHMEM_NAME_SEM_TRAINING, O_RDONLY, (void **)&training_data, &training_data_sem) != 0)
+    /* This could also just be done inside the thread which uses it but would make cleanup more 
+    difficult. */
+    if (shmem_map(TCO_SHMEM_NAME_TRAINING,
+                  TCO_SHMEM_SIZE_TRAINING,
+                  TCO_SHMEM_NAME_SEM_TRAINING,
+                  O_RDONLY,
+                  (void **)&training_data,
+                  &training_data_sem) != 0)
     {
       log_error("Failed to map shared memory and associated semaphore");
       return EXIT_FAILURE;
@@ -258,6 +342,11 @@ int main(int argc, char *argv[])
   }
   else
   {
+    /* Run the real camera pipeline which reads raw frames and passes them to a user controlled 
+    processing function.
+
+    Since running a single pipeline does not require multiple children threads, it is ran from 
+    the main thread. */
     camera_user_data_t user_data = {{NULL, NULL}, {NULL, NULL}};
     if (camera_pipeline_run(&user_data) != 0)
     {
