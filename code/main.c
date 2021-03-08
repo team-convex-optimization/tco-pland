@@ -13,6 +13,7 @@
 #include "tco_shmem.h"
 #include "camera.h"
 #include "trajection.h"
+#include "preprocessing.h"
 
 int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 
