@@ -7,12 +7,14 @@
 #include "tco_shmem.h"
 #include "cam_mgr.h"
 #include "segmentation.h"
+#include "trajection.h"
 
 int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 
 void proc_func(uint8_t *pixels, int length, void *args)
 {
   segment((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
+  show_target_lines((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
 }
 
 int main(int argc, char *argv[])

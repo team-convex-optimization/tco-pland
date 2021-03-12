@@ -1,7 +1,4 @@
 #include <stdlib.h>
-
-#include <string.h>
-
 #include "segmentation.h"
 
 void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
