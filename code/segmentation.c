@@ -19,14 +19,17 @@ void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
                 continue;
             }
 
-            if (height_idx + look_ahead_length < TCO_SIM_HEIGHT &&
+            else if (height_idx + look_ahead_length < TCO_SIM_HEIGHT &&
                 abs((*pixels)[height_idx][width_idx] - (*pixels)[height_idx + look_ahead_length][width_idx]) > delta_threshold)
             {
                 (*pixels)[height_idx][width_idx] = 255;
                 continue;
             }
 
-            (*pixels)[height_idx][width_idx] = 0;
+            else 
+            {
+                (*pixels)[height_idx][width_idx] = 0;
+            }
         }
     }
 }
