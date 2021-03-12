@@ -11,4 +11,6 @@
  */
 void show_target_lines(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
 
+void plot_targets(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
+
 #endif /* _TRAJECTION_H_ */
