@@ -31,7 +31,7 @@ void plot_square(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t poin
 }
 
 
-uint8_t plot_targets(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
+void plot_targets(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
 {
     const uint16_t target_line_0 = (TCO_SIM_HEIGHT) / 5;
     const uint16_t target_line_1 = (TCO_SIM_HEIGHT) / 3;
