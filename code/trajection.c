@@ -1,13 +1,14 @@
 #include "trajection.h"
 #include <stdio.h>
+
 void show_target_lines(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
 {
     const uint16_t target_line_0 = (TCO_SIM_HEIGHT) / 5;
     const uint16_t target_line_1 = (TCO_SIM_HEIGHT) / 3;
     for (int i = 0; i < TCO_SIM_WIDTH; i++)
     {
-        (*pixels)[target_line_0][i] = 32;
-        (*pixels)[target_line_1][i] = 32;
+        (*pixels)[target_line_0+1][i] = 32;
+        (*pixels)[target_line_1+1][i] = 32;
     }
 }
 
@@ -18,10 +19,10 @@ void plot_square(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t poin
     const int radius = size/2;
     for (int i = size-radius; i < size+radius; i++)
     {
-        uint16_t xpoint = pointx + i;
+        uint16_t xpoint = pointx + i - size;
         for (int j = size-radius; j < size+radius; j++)
         {
-            uint16_t ypoint = pointy + j;
+            uint16_t ypoint = pointy + j - size;
             if (xpoint > TCO_SIM_WIDTH || ypoint > TCO_SIM_WIDTH) /* Bound checking */
                 break;
 
@@ -31,7 +32,7 @@ void plot_square(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t poin
 }
 
 
-void plot_targets(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
+void find_targets(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
 {
     const uint16_t target_line_0 = (TCO_SIM_HEIGHT) / 5;
     const uint16_t target_line_1 = (TCO_SIM_HEIGHT) / 3;
