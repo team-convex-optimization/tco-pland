@@ -7,9 +7,10 @@
 /**
  * @brief Will plot a target of where the next optimal point is for the car to be
  * @param image A segmented image. See `segmentation.h:segment(...)`
+ * @param height The height to point the line
  * @return the image is passed by reference. This reference is modified. 
  */
-void show_target_lines(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
+void show_target_lines(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t height);
 
 /**
  * @brief Will plot squares on the image to help visualize trajection(s)
@@ -24,5 +25,7 @@ void plot_square(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t poin
 
 
 void find_targets(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
+void plot_vector_points(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
+
 
 #endif /* _TRAJECTION_H_ */
