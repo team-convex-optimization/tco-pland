@@ -32,54 +32,50 @@ void plot_square(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t poin
 }
 
 
+void find_edges_scan(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t height, uint16_t (*edges)[2])
+{
+    const uint16_t center_width = TCO_SIM_WIDTH /2;
+    for (uint16_t i = center_width; i < TCO_SIM_WIDTH; i++)
+    {
+        if ((*pixels)[height][i] == 255)
+        {
+            (*edges)[0] = i; 
+            break;
+        } 
+    }
+    for (uint16_t i = center_width; i > 0; i--)
+    {
+        if ((*pixels)[height][i] == 255)
+        {
+            (*edges)[1] = i;
+            break;
+        } 
+    }
+
+}
+
 void find_targets(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
 {
     const uint16_t target_line_0 = (TCO_SIM_HEIGHT) / 5;
     const uint16_t target_line_1 = (TCO_SIM_HEIGHT) / 3;
-    const uint16_t center_width = TCO_SIM_WIDTH /2;
 
-    uint16_t top_line_l, top_line_r, bot_line_r, bot_line_l = 0;
+    uint16_t top_lines[2], bottom_lines[2];
+    /* Find edges */
+    find_edges_scan(pixels, target_line_0, &top_lines);
+    find_edges_scan(pixels, target_line_1, &bottom_lines);
 
-
-    /* Find edges for target_line_0 */
-    for (uint16_t i = center_width; i < TCO_SIM_WIDTH; i++)
-    {
-        if ((*pixels)[target_line_0][i] == 255)
-        {
-            top_line_r = i;
-            break;
-        } 
-    }
-    for (uint16_t i = center_width; i > 0; i--)
-    {
-        if ((*pixels)[target_line_0][i] == 255)
-        {
-            top_line_l = i;
-            break;
-        } 
-    }
-
-    /* Find edges for target_line_1 */
-    for (uint16_t i = center_width; i < TCO_SIM_WIDTH; i++)
-    {
-        if ((*pixels)[target_line_1][i] == 255)
-        {
-            bot_line_r = i;
-            break;
-        } 
-    }
-    for (uint16_t i = center_width; i > 0; i--)
-    {
-        if ((*pixels)[target_line_1][i] == 255)
-        {
-            bot_line_l = i;
-            break;
-        } 
-    }
-    
     /* Paint the edges gray */
-    plot_square(pixels, top_line_l, target_line_0, 10, 128);
-    plot_square(pixels, top_line_r, target_line_0, 10, 192);
-    plot_square(pixels, bot_line_l, target_line_1, 10, 128);
-    plot_square(pixels, bot_line_r, target_line_1, 10, 192);
+    plot_square(pixels, top_lines[0], target_line_0, 10, 128);
+    plot_square(pixels, top_lines[1], target_line_0, 10, 192);
+    plot_square(pixels, bottom_lines[0], target_line_1, 10, 128);
+    plot_square(pixels, bottom_lines[1], target_line_1, 10, 192);
+}
+
+void plot_vector_points(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
+{
+    //Take scanline for firstrow at bottom. Then go up an increment and spread from same X, looking for next point.
+    //Do this and there should be a series of points that are on the line!
+
+
+
 }
