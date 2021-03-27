@@ -11,4 +11,6 @@
  */
 void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
 
+void flood_fill(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y);
+
 #endif /* _SEGMENTATION_H_ */

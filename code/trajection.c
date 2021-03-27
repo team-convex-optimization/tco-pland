@@ -82,6 +82,7 @@ uint16_t find_edge_around_point(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]
             return center-i;
         }
     }
+    return -1; /* ERROR */
 }
 
 void plot_vector_points(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
