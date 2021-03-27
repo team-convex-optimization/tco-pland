@@ -31,9 +31,9 @@ void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
     }
 }
 
+/* The below is used for flood_filling the image. */
+
 /*
- Will return a pixel at position (x,y). 
-*/
 uint8_t *get_pixel(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y) {
     if (y < 0 || y > TCO_SIM_HEIGHT || x < 0 || x > TCO_SIM_WIDTH)
         return NULL;
@@ -47,13 +47,10 @@ uint8_t get_pixel_color(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16
 }
 
 void set_pixel(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y, uint8_t color) {
-    // uint8_t *pixel = get_pixel(pixels, x, y);
-    // *pixel = color;
     (*pixels)[y][x] = color;
 }
 
 void flood_fill(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y) {
-    /* Intuition: The idea here is to use Breadth First Search to start exploring which nodes need to be filled. */
     if (y < 0 || y >= TCO_SIM_HEIGHT || x < 0 || x >= TCO_SIM_WIDTH)
     {
         return;
@@ -62,11 +59,10 @@ void flood_fill(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, ui
     if(get_pixel_color(pixels, x, y) == 0)
 	{
         set_pixel(pixels, x, y, 255);
-		flood_fill(pixels, x+1, y); /* Reccursivly search the rest of the track */
+		flood_fill(pixels, x+1, y); 
 		flood_fill(pixels, x, y+1);
 		flood_fill(pixels, x-1, y);
 		flood_fill(pixels, x, y-1);
 	}
-
-    return; /* IMPLEMENT ME */
 }
+*/

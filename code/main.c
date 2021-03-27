@@ -14,7 +14,7 @@ int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 void proc_func(uint8_t *pixels, int length, void *args)
 {
   segment((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
-  flood_fill((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels, 10, 10);
+  // flood_fill((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels, 10, 10);
   // find_targets((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
   // plot_vector_points((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
 }

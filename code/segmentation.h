@@ -11,6 +11,11 @@
  */
 void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
 
-void flood_fill(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y);
+/**
+ * @brief Fill in sections of image segmented by white lines
+ * @param image a grayscale image which segments the image. 
+ * @return the image is passed by reference. This reference is modified. 
+ */
+// void flood_fill(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y);
 
 #endif /* _SEGMENTATION_H_ */
