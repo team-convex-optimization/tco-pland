@@ -5,13 +5,13 @@
 
 typedef struct frame_processor_t
 {
-    void (*func)(uint8_t *, int, void *); /* Pixels | Length | Args */
+    void (*func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *); /* Pixels | Length | Args */
     void *args;
 } frame_processor_t;
 
 typedef struct frame_injector_t
 {
-    void (*func)(uint8_t *, int, void *); /* Pixel destination | Length | Args */
+    void (*func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *); /* Pixel destination | Length | Args */
     void *args;
 } frame_injector_t;
 
