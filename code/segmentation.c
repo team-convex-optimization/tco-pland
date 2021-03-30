@@ -32,37 +32,17 @@ void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
 }
 
 /* The below is used for flood_filling the image. */
-
-/*
-uint8_t *get_pixel(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y) {
-    if (y < 0 || y > TCO_SIM_HEIGHT || x < 0 || x > TCO_SIM_WIDTH)
-        return NULL;
-    return pixels[y][x];
-}
-
-uint8_t get_pixel_color(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y) {
-    if (y < 0 || y > TCO_SIM_HEIGHT || x < 0 || x > TCO_SIM_WIDTH)
-        return NULL; //error
-    return (*pixels)[y][x];
-}
-
-void set_pixel(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y, uint8_t color) {
-    (*pixels)[y][x] = color;
-}
-
 void flood_fill(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t x, uint16_t y) {
-    if (y < 0 || y >= TCO_SIM_HEIGHT || x < 0 || x >= TCO_SIM_WIDTH)
-    {
+    if (y >= TCO_SIM_HEIGHT || x >= TCO_SIM_WIDTH || *pixels == NULL || x == 0 || y == 0)
         return;
-    }
     
-    if(get_pixel_color(pixels, x, y) == 0)
+    if((*pixels)[y][x] == 0)
 	{
-        set_pixel(pixels, x, y, 255);
-		flood_fill(pixels, x+1, y); 
-		flood_fill(pixels, x, y+1);
-		flood_fill(pixels, x-1, y);
-		flood_fill(pixels, x, y-1);
+        (*pixels)[y][x] = 255; /* Set to white */
+		flood_fill(pixels, x + 1, y); 
+		flood_fill(pixels, x, y + 1);
+		flood_fill(pixels, x - 1, y);
+		flood_fill(pixels, x, y - 1);
 	}
 }
-*/
+
