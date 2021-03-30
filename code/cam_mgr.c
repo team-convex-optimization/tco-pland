@@ -219,7 +219,7 @@ static void frame_test_injector(uint8_t *pixel_dest, int length, void *args_ptr)
  * @param length The size of the pixels array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_processor_t' args field.
  */
-static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
+static void frame_raw_processor(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
 {
     static uint16_t fps_now = 0;
     static uint16_t fps_counter = 0; /* Number of frames that passed in the current second. */
@@ -290,7 +290,7 @@ static void frame_raw_processor(uint8_t *pixels, int length, void *args_ptr)
  * @param length The size of the pixels array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
  */
-static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
+static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
 {
     if (frame_size_expected != length)
     {
@@ -333,7 +333,7 @@ static void frame_raw_injector(uint8_t *pixel_dest, int length, void *args_ptr)
  * @param length The size of the pixels array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
  */
-static void frame_processed_injector(uint8_t *pixel_dest, int length, void *args_ptr)
+static void frame_processed_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
 {
     if (frame_size_expected != length)
     {
