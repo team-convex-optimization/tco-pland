@@ -8,20 +8,20 @@
 #include <signal.h>
 #include <pthread.h>
 #include <time.h>
-#include <math.h>
 
 #include "tco_shmem.h"
 #include "tco_libd.h"
 #include "cam.h"
+#include "draw.h"
 
 /* A user defined function which received pointer to frame data and does anything it wants with it.
 */
-typedef struct compute_user_data_t
+typedef struct cam_mgr_user_data_t
 {
-    void (*f)(uint8_t *, int, void *);
+    void (*f)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *);
     void *args;
     struct timespec frame_end_times[2]; /* Hold times measured at end of a frame. */
-} compute_user_data_t;
+} cam_mgr_user_data_t;
 
 static struct tco_shmem_data_training *training_data;
 static sem_t *training_data_sem;
@@ -37,7 +37,7 @@ static uint8_t using_threads = 0;
 static pthread_t thread_display = {0};
 static pthread_t thread_camera_sim = {0};
 static atomic_char exit_requested = 0; /* Gets written by all children threads and gets read in the main thread. */
-static compute_user_data_t compute_user_data;
+static cam_mgr_user_data_t compute_user_data;
 
 /**
  * @brief This method is used as a handler for various basic signals. It does not do much but it
@@ -52,136 +52,12 @@ static void handle_signals(int sig)
 }
 
 /**
- * @brief Draws a number at a given position in an image.
- * @param pixels The image which the number will be drawn on.
- * @param number The number that will be drawn.
- * @param x_start The start x position where the number will be drawn.
- * @param y_start The start y position where the number will be drawn.
- */
-static void frame_draw_number(uint8_t *const pixels, uint16_t const number, uint16_t const start_x, uint16_t const start_y)
-{
-    static const uint8_t digit_scale = 4;   /* How much to scale each digit (scaling is done uniformly in x and y axis). */
-    static const uint8_t digit_spacing = 4; /* Distance between digits horizontally. */
-    static const uint8_t digit_num_max = 5; /* Passed number is limited in size by the uint16_t type. */
-    static const uint8_t digit_width = 4;
-    static const uint8_t digit_height = 7;
-    /* Each digit is described by a 4 by 7 array of pixels where 1 means white and 0 means black. */
-    static const uint8_t digit_pixels[10][4 * 7] = {
-        {1, 1, 1, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 1, 1, 1},
-        {0, 1, 1, 0,
-         0, 0, 1, 0,
-         0, 0, 1, 0,
-         0, 0, 1, 0,
-         0, 0, 1, 0,
-         0, 0, 1, 0,
-         1, 1, 1, 1},
-        {1, 1, 1, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         1, 1, 1, 1,
-         1, 0, 0, 0,
-         1, 0, 0, 0,
-         1, 1, 1, 1},
-        {1, 1, 1, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         1, 1, 1, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         1, 1, 1, 1},
-        {1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 1, 1, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1},
-        {1, 1, 1, 1,
-         1, 0, 0, 0,
-         1, 0, 0, 0,
-         1, 1, 1, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         1, 1, 1, 1},
-        {1, 1, 1, 1,
-         1, 0, 0, 0,
-         1, 0, 0, 0,
-         1, 1, 1, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 1, 1, 1},
-        {1, 1, 1, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1},
-        {1, 1, 1, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 1, 1, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 1, 1, 1},
-        {1, 1, 1, 1,
-         1, 0, 0, 1,
-         1, 0, 0, 1,
-         1, 1, 1, 1,
-         0, 0, 0, 1,
-         0, 0, 0, 1,
-         1, 1, 1, 1},
-    };
-
-    char num_str[digit_num_max];
-    sprintf((char *)&num_str, "%u", number);
-
-    uint8_t digit_num = 0;
-    for (uint8_t num_str_idx = 0; num_str_idx < digit_num_max; num_str_idx++)
-    {
-        if (num_str[num_str_idx] == '\0')
-        {
-            break; /* No more digits. */
-        }
-        digit_num += 1;
-    }
-
-    uint8_t const white = 255;
-    uint32_t row_start_idx = (start_y * TCO_SIM_WIDTH) + start_x;
-    for (uint8_t pixel_idx_y = 0; pixel_idx_y < digit_height; pixel_idx_y++)
-    {
-        for (uint8_t scanline_idx = 0; scanline_idx < digit_scale; scanline_idx++)
-        {
-            uint32_t row_start_idx_offset = 0;
-            for (uint8_t digit_idx = 0; digit_idx < digit_num; digit_idx++)
-            {
-                uint8_t digit = num_str[digit_idx] - '0';
-                memset(&pixels[row_start_idx + row_start_idx_offset], 0, digit_spacing);
-                row_start_idx_offset += digit_spacing;
-                for (uint8_t pixel_idx_x = 0; pixel_idx_x < digit_width; pixel_idx_x++)
-                {
-                    memset(&pixels[row_start_idx + row_start_idx_offset], digit_pixels[digit][(digit_width * pixel_idx_y) + pixel_idx_x] * white, digit_scale);
-                    row_start_idx_offset += digit_scale;
-                }
-            }
-            row_start_idx += TCO_SIM_WIDTH;
-        }
-    }
-}
-
-/**
  * @brief Inject a diagonally scrolling grayscale gradient to the destination pointer.
  * @param pixel_dest Where the frame will be written.
  * @param length The length of the 'pixel_dest' array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
  */
-static void frame_test_injector(uint8_t *pixel_dest, int length, void *args_ptr)
+static void frame_test_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
 {
     static float offset = 0.0;           /* Offset of the gradient along the diagonal as a fraction of the diagonal length. */
     const float pix_val_white = 255.0f;  /* 0=black, 255=white. */
@@ -202,7 +78,7 @@ static void frame_test_injector(uint8_t *pixel_dest, int length, void *args_ptr)
             {
                 pix_offset -= 1.0f;
             }
-            pixel_dest[x + (y * TCO_SIM_WIDTH)] = (int)(pix_offset * pix_val_white);
+            (*pixel_dest)[y][x] = (int)(pix_offset * pix_val_white);
         }
     }
     offset += speed_scrolling;
@@ -237,11 +113,11 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
     /* Process image here by modifying 'frame_processed_tmp'. */
-    compute_user_data_t *compute_user_data = args_ptr;
-    compute_user_data->f((uint8_t *)&frame_processed_tmp, frame_size_expected, compute_user_data->args);
+    cam_mgr_user_data_t *compute_user_data = args_ptr;
+    compute_user_data->f(&frame_processed_tmp, frame_size_expected, compute_user_data->args);
 
     /* Measure FPS. */
-    frame_draw_number((uint8_t *)&frame_processed_tmp, fps_now, 10, 10);
+    draw_number(&frame_processed_tmp, fps_now, 10, 10);
     if (fps_counter == 0)
     {
         clock_gettime(CLOCK_REALTIME, &compute_user_data->frame_end_times[0]);
@@ -386,7 +262,7 @@ static void *thread_job_display_pipeline(void *args)
  */
 static void *thread_job_camera_sim_pipeline(void *args)
 {
-    compute_user_data_t *compute_user_data = args; /* Show what the arg pointer is explicitly. */
+    cam_mgr_user_data_t *compute_user_data = args; /* Show what the arg pointer is explicitly. */
     cam_user_data_t user_data_camera_sim = {{&frame_raw_processor, compute_user_data}, {&frame_raw_injector, NULL}};
     if (cam_sim_pipeline_run(&user_data_camera_sim) != 0)
     {
@@ -466,7 +342,7 @@ static void detect_and_handle_exit_requested(void)
  * @param proc_func A function which will process a frame and use its data in any way it wants.
  * @param proc_func_args Pointer to arguments which will be passed to proc_fucn when it is called.
  */
-static int run_camera_real(void (*proc_func)(uint8_t *, int, void *), void *proc_func_args)
+static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *), void *proc_func_args)
 {
     compute_user_data.f = proc_func;
     compute_user_data.args = proc_func_args;
@@ -491,7 +367,7 @@ static int run_camera_real(void (*proc_func)(uint8_t *, int, void *), void *proc
  * @param proc_func A function which will process a frame and use its data in any way it wants.
  * @param proc_func_args Pointer to arguments which will be passed to proc_fucn when it is called.
  */
-static int run_camera_sim(void (*proc_func)(uint8_t *, int, void *), void *proc_func_args)
+static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *), void *proc_func_args)
 {
     using_threads = 1;
     register_signal_handler();
@@ -536,7 +412,7 @@ static int run_camera_sim(void (*proc_func)(uint8_t *, int, void *), void *proc_
     return EXIT_SUCCESS;
 }
 
-int cam_mgr_run(uint8_t real_or_sim, void (*proc_func)(uint8_t *, int, void *), void *proc_func_args)
+int cam_mgr_run(uint8_t real_or_sim, void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *), void *proc_func_args)
 {
     if (real_or_sim)
     {

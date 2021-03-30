@@ -4,7 +4,7 @@
 
 void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
 {
-    uint8_t const delta_threshold = 100;
+    uint8_t const delta_threshold = 110;
     uint8_t const look_ahead_length = 4;
     for (uint16_t height_idx = 0; height_idx < TCO_SIM_HEIGHT; height_idx++)
     {

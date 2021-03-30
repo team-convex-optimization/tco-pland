@@ -9,12 +9,19 @@
 #include "segmentation.h"
 #include "trajection.h"
 
-int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
+const int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
+const int draw_enabled = 1;
 
 void proc_func(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args)
 {
-  segment((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
-  plot_vector_points((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
+  for (size_t y = 210; y < TCO_SIM_HEIGHT; y++)
+  {
+    for (size_t x = 0; x < TCO_SIM_WIDTH; x++)
+    {
+      (*pixels)[y][x] = 0;
+    }
+  }
+  // segment((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
 }
 
 int main(int argc, char *argv[])
