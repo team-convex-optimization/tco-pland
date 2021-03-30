@@ -15,6 +15,7 @@ static uint16_t track_centers[TRACK_CENTER_COUNT] = {0};
 static uint8_t track_centers_push_idx = 0;
 
 static uint16_t ray_length_last = 0;
+static point2_t ray_hit = {0, 0};
 
 static void track_center_push(uint16_t track_center_new)
 {
@@ -78,19 +79,19 @@ void track_center(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t bot
 
 static uint8_t shoot_ray_callback(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t point)
 {
-    if ((*pixels)[point.y][point.x] == 0)
+    if ((*pixels)[point.y][point.x] != 255)
     {
         ray_length_last += 1;
+        ray_hit.x = point.x;
+        ray_hit.y = point.y;
+        return 0;
     }
-    else
-    {
-        return -1;
-    }
-    return 0;
+    return -1;
 }
 
 static uint16_t shoot_ray(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t const start, vec2_t const dir)
 {
+    draw_square(pixels, start, 10, 120);
     /* How much to stretch the direction vector so it touches the frame border. */
     float const edge_stretch_x = dir.x < 0 ? start.x / fabs((float)dir.x) : (TCO_SIM_WIDTH - start.x) / fabs((float)dir.x);
     log_debug("edge stretch x: %f", edge_stretch_x);
@@ -106,19 +107,17 @@ static uint16_t shoot_ray(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], poin
     point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
 
     log_debug("end %u %u", end.x, end.y);
-    draw_square(pixels, end, 10, 120);
 
     bresenham(pixels, &shoot_ray_callback, start, end);
+    draw_square(pixels, ray_hit, 10, 120);
 
     return ray_length_last;
 }
 
 void track_distances(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t bottom_row)
 {
-    point2_t const start = {200, bottom_row};
-    vec2_t const dir = {40, -20};
-    uint16_t const ray_length = shoot_ray(pixels, start, dir);
-
-    draw_square(pixels, start, 10, 120);
-    draw_square(pixels, (point2_t){start.x + dir.x, start.y + dir.y}, 10, 120);
+    point2_t const start = {TCO_SIM_WIDTH / 2, bottom_row};
+    shoot_ray(pixels, start, (vec2_t){0, -1});
+    shoot_ray(pixels, start, (vec2_t){1, -1});
+    shoot_ray(pixels, start, (vec2_t){-1, -1});
 }
