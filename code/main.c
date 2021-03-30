@@ -5,6 +5,7 @@
 
 #include "tco_libd.h"
 #include "tco_shmem.h"
+
 #include "cam_mgr.h"
 #include "segmentation.h"
 #include "trajection.h"
@@ -14,14 +15,15 @@ const int draw_enabled = 1;
 
 void proc_func(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args)
 {
-  for (size_t y = 210; y < TCO_SIM_HEIGHT; y++)
+  for (size_t y = 211; y < TCO_SIM_HEIGHT; y++)
   {
     for (size_t x = 0; x < TCO_SIM_WIDTH; x++)
     {
       (*pixels)[y][x] = 0;
     }
   }
-  // segment((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])pixels);
+  segment(pixels);
+  track_center(pixels, 209);
 }
 
 int main(int argc, char *argv[])

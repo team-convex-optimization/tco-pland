@@ -1,87 +1,72 @@
-#include "trajection.h"
-#include "segmentation.h"
-#include "draw.h"
 #include <stdio.h>
+#include <string.h>
 
-/* Todo, take center of last frame as new 'center point' here */
-void find_edges_scan(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t height, uint16_t (*edges)[2])
+#include "tco_libd.h"
+
+#include "trajection.h"
+#include "draw.h"
+#include "sort.h"
+
+static uint8_t const TRACK_CENTER_COUNT = 4;
+uint16_t track_centers[TRACK_CENTER_COUNT] = {0};
+uint8_t track_centers_push_idx = 0;
+
+static void track_center_push(uint16_t track_center_new)
 {
-    const uint16_t center_width = TCO_SIM_WIDTH /2;
-    for (uint16_t i = center_width; i < TCO_SIM_WIDTH; i++)
-    {
-        if ((*pixels)[height][i] == 255)
-        {
-            (*edges)[0] = i; 
-            break;
-        } 
-    }
-    for (uint16_t i = center_width; i > 0; i--)
-    {
-        if ((*pixels)[height][i] == 255)
-        {
-            (*edges)[1] = i;
-            break;
-        } 
-    }
-
+    track_centers[(track_centers_push_idx + 1) % TRACK_CENTER_COUNT] = track_center_new;
+    track_centers_push_idx += 1;
+    track_centers_push_idx %= TRACK_CENTER_COUNT;
 }
 
-/* Will search for the white line from a given center point */
-uint16_t find_edge_around_point(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t height, uint16_t center, uint16_t max_spread)
+static uint16_t track_center_compute()
 {
-    for (int i = 0; i < max_spread; i++)
+    uint16_t track_centers_cpy[TRACK_CENTER_COUNT];
+    memcpy(track_centers_cpy, track_centers, TRACK_CENTER_COUNT * sizeof(uint16_t));
+    insertion_sort_integer((uint8_t *)track_centers_cpy, TRACK_CENTER_COUNT, 2, &comp_u16);
+
+    uint16_t median;
+    if (TRACK_CENTER_COUNT % 2 == 0)
     {
-        if (center+i < TCO_SIM_WIDTH && (*pixels)[height][center+i] == 255)
-        {
-            return center+i;
-        }
-        if (center-i > 0 && (*pixels)[height][center-i] == 255)
-        {
-            return center-i;
-        }
+        /* Median of evenly long array is average of 2 central values. */
+        median = (track_centers_cpy[(TRACK_CENTER_COUNT - 1) / 2] + track_centers_cpy[((TRACK_CENTER_COUNT - 1) / 2) + 1]) / 2;
     }
-    return -1; /* ERROR */
+    else
+    {
+        median = track_centers_cpy[TRACK_CENTER_COUNT / 2];
+    }
+
+    return median;
 }
 
-void plot_vector_points(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])
+void track_center(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t bottom_row_idx)
 {
-    /* Take scanline for firstrow at bottom. Then go up an increment and spread from same X, looking for next point.
-        Do this and there should be a series of points that are on the line! */
-    const uint16_t target_lines[5] = {
-        (6 * TCO_SIM_HEIGHT) / 12,  /* Closest to the car */
-        (5 * TCO_SIM_HEIGHT) / 12,
-        (4 * TCO_SIM_HEIGHT) / 12,
-        (3 * TCO_SIM_HEIGHT) / 12,
-        (2 * TCO_SIM_HEIGHT) / 12
-    };
-    const uint16_t max_spread = 100; /* Pixels */
-    uint16_t edges[5][2];
-
-    /* Find the bottom line */
-    find_edges_scan(pixels, target_lines[0], &edges[0]);
-
-    #ifdef DRAW
-    plot_square(pixels, edges[0][0], target_lines[0], 10, 128);
-    plot_square(pixels, edges[0][1], target_lines[0], 10, 192);
-    #endif
-
-    /* For the remaining edges, we need to find the new points based on the previous points */
-    for (int i = 1; i < 5; i++)
+    uint16_t region_largest_size = 0;
+    uint16_t region_largest_start = 0;
+    uint16_t region_size = 0;
+    uint16_t region_start = 0;
+    for (uint16_t x = 0; x < TCO_SIM_WIDTH; x++)
     {
-        for (int j = 0; j < 2; j++)
+        if ((*pixels)[bottom_row_idx][x] == 255)
         {
-            if (edges[i-1][j] == 0) continue;
-            edges[i][j] = find_edge_around_point(pixels, target_lines[i], edges[i-1][j], max_spread);
-            #ifdef DRAW
-            plot_square(pixels, edges[i][j], target_lines[i], 10, 128);
-            #endif
+            region_size += 1;
+        }
+        else
+        {
+            if (region_size > region_largest_size)
+            {
+                region_largest_start = region_start;
+                region_largest_size = region_size;
+            }
+            region_start = x;
+            region_size = 0;
         }
     }
-
-    /* Show the target_lines */
-    #ifdef DRAW
-    for (int i = 0; i < 5; i++)
-        show_target_lines(pixels, target_lines[i]);
-    #endif
-    
+    if (region_size > region_largest_size)
+    {
+        region_largest_start = region_start;
+        region_largest_size = region_size;
+    }
+    uint16_t track_center_new = region_largest_start + (region_largest_size / 2);
+    track_center_push(track_center_new);
+    draw_square(pixels, track_center_compute(), bottom_row_idx, 10, 100);
 }

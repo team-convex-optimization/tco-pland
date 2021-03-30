@@ -16,25 +16,23 @@ void draw_horiz_line(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uin
     }
 }
 
-void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const pointx, uint16_t const pointy, int const size, uint8_t const color)
+void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const point_x, uint16_t const point_y, int const size, uint8_t const color)
 {
     if (!draw_enabled)
     {
         return;
     }
-    if (pointx < 0 || pointy < 0)
-        return;
     const int radius = size / 2;
     for (int i = size - radius; i < size + radius; i++)
     {
-        uint16_t xpoint = pointx + i - size;
+        uint16_t point_x_cur = point_x + i - size;
         for (int j = size - radius; j < size + radius; j++)
         {
-            uint16_t ypoint = pointy + j - size;
-            if (xpoint > TCO_SIM_WIDTH || ypoint > TCO_SIM_WIDTH) /* Bound checking */
+            uint16_t point_y_cur = point_y + j - size;
+            if (point_x_cur > TCO_SIM_WIDTH || point_y_cur > TCO_SIM_WIDTH) /* Bound checking */
                 break;
 
-            (*pixels)[ypoint][xpoint] = color;
+            (*pixels)[point_y_cur][point_x_cur] = color;
         }
     }
 }
@@ -144,7 +142,6 @@ void draw_number(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_
         digit_num += 1;
     }
 
-    log_debug("Drawing num: %u, digit num: %u", number, digit_num);
     uint16_t const scanline_width = digit_num * ((digit_scale * digit_width) + digit_spacing);
     for (uint8_t scanline_y = 0; scanline_y < digit_height; scanline_y++)
     {
