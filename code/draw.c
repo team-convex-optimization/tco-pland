@@ -10,40 +10,49 @@ void draw_horiz_line(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uin
     {
         return;
     }
-    for (int i = 0; i < TCO_SIM_WIDTH; i++)
+    for (uint16_t i = 0; i < TCO_SIM_WIDTH; i++)
     {
         (*pixels)[row_idx][i] = 32;
     }
 }
 
-void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const point_x, uint16_t const point_y, int const size, uint8_t const color)
+void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const point_x, uint16_t const point_y, uint8_t const size, uint8_t const color)
 {
     if (!draw_enabled)
     {
         return;
     }
-    const int radius = size / 2;
-    for (int i = size - radius; i < size + radius; i++)
-    {
-        uint16_t point_x_cur = point_x + i - size;
-        for (int j = size - radius; j < size + radius; j++)
-        {
-            uint16_t point_y_cur = point_y + j - size;
-            if (point_x_cur > TCO_SIM_WIDTH || point_y_cur > TCO_SIM_WIDTH) /* Bound checking */
-                break;
+    const uint16_t radius = size / 2;
+    uint8_t square_row[size];
+    memset(square_row, color, size);
 
-            (*pixels)[point_y_cur][point_x_cur] = color;
+    for (uint16_t y = 0; y < size; y++)
+    {
+        int32_t const draw_y = point_y - radius;
+        if (draw_y + y < 0 || draw_y + y >= TCO_SIM_HEIGHT)
+        {
+            continue;
         }
+
+        int32_t const draw_x_left_offset = point_x - radius < 0 ? -(point_x - radius) : 0;
+        int32_t const draw_x_right_offset = point_x + radius >= TCO_SIM_HEIGHT ? (point_x + radius) - TCO_SIM_HEIGHT : 0;
+        int32_t const draw_x = point_x + draw_x_left_offset - draw_x_right_offset - radius;
+        if (draw_x < 0)
+        {
+            /* When frame is too small for square */
+            return;
+        }
+        int32_t const draw_width = size - draw_x_right_offset - draw_x_left_offset;
+        if (draw_width < 0)
+        {
+            /* When frame is too small for square */
+            return;
+        }
+
+        memcpy(&(*pixels)[draw_y + y][draw_x], square_row, draw_width);
     }
 }
 
-/**
- * @brief Draws a number at a given position in an image.
- * @param pixels The image which the number will be drawn on.
- * @param number The number that will be drawn.
- * @param x_start The start x position where the number will be drawn.
- * @param y_start The start y position where the number will be drawn.
- */
 void draw_number(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const number, uint16_t const start_x, uint16_t const start_y)
 {
     if (!draw_enabled)

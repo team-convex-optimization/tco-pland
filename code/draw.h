@@ -21,7 +21,7 @@ void draw_line_horiz(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uin
  * @param size the width of the square
  * @param color the grayscale color of the square
  */
-void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const pointx, uint16_t const pointy, int const size, uint8_t const color);
+void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const pointx, uint16_t const pointy, uint8_t const size, uint8_t const color);
 
 /**
  * @brief Draws a number at a given position in an image.
