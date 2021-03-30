@@ -117,7 +117,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]
     compute_user_data->f(&frame_processed_tmp, frame_size_expected, compute_user_data->args);
 
     /* Measure FPS. */
-    draw_number(&frame_processed_tmp, fps_now, 10, 10);
+    draw_number(&frame_processed_tmp, fps_now, (point2_t){10, 10});
     if (fps_counter == 0)
     {
         clock_gettime(CLOCK_REALTIME, &compute_user_data->frame_end_times[0]);

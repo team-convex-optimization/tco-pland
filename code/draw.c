@@ -16,7 +16,7 @@ void draw_horiz_line(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uin
     }
 }
 
-void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const point_x, uint16_t const point_y, uint8_t const size, uint8_t const color)
+void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t const point, uint8_t const size, uint8_t const color)
 {
     if (!draw_enabled)
     {
@@ -28,16 +28,16 @@ void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_
 
     for (uint16_t y = 0; y < size; y++)
     {
-        int32_t const draw_y = point_y - radius;
+        int32_t const draw_y = point.y - radius;
         if (draw_y + y < 0 || draw_y + y >= TCO_SIM_HEIGHT)
         {
             /* When outside the frame. */
             continue;
         }
 
-        int32_t const draw_x_left_offset = point_x - radius < 0 ? -(point_x - radius) : 0;
-        int32_t const draw_x_right_offset = point_x + radius >= TCO_SIM_WIDTH ? (point_x + radius) - TCO_SIM_WIDTH : 0;
-        int32_t const draw_x = point_x + draw_x_left_offset - draw_x_right_offset - radius;
+        int32_t const draw_x_left_offset = point.x - radius < 0 ? -(point.x - radius) : 0;
+        int32_t const draw_x_right_offset = point.x + radius >= TCO_SIM_WIDTH ? (point.x + radius) - TCO_SIM_WIDTH : 0;
+        int32_t const draw_x = point.x + draw_x_left_offset - draw_x_right_offset - radius;
         if (draw_x < 0)
         {
             /* When frame is too small for square. */
@@ -54,7 +54,7 @@ void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_
     }
 }
 
-void draw_number(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const number, uint16_t const start_x, uint16_t const start_y)
+void draw_number(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const number, point2_t const start)
 {
     if (!draw_enabled)
     {
@@ -173,7 +173,7 @@ void draw_number(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_
         }
         for (uint8_t row_n = 0; row_n < digit_scale; row_n++)
         {
-            memcpy(&(*pixels)[start_y + (scanline_y * digit_scale) + row_n][start_x], &scanline, scanline_width);
+            memcpy(&(*pixels)[start.y + (scanline_y * digit_scale) + row_n][start.x], &scanline, scanline_width);
         }
     }
 }

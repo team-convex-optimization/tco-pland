@@ -9,6 +9,7 @@
 #include "cam_mgr.h"
 #include "segmentation.h"
 #include "trajection.h"
+#include "draw.h"
 
 const int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 const int draw_enabled = 1;
@@ -23,7 +24,8 @@ void proc_func(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, voi
     }
   }
   segment(pixels);
-  track_center(pixels, 209);
+  track_distances(pixels, 210);
+  // track_center(pixels, 210);
 }
 
 int main(int argc, char *argv[])
