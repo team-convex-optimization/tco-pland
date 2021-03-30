@@ -43,7 +43,7 @@ static uint16_t track_center_compute()
     return median;
 }
 
-void track_center(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t starttom_row_idx)
+void track_center(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t bottom_row_idx)
 {
     uint16_t region_largest_size = 0;
     uint16_t region_largest_start = 0;
@@ -51,7 +51,7 @@ void track_center(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t sta
     uint16_t region_start = 0;
     for (uint16_t x = 0; x < TCO_SIM_WIDTH; x++)
     {
-        if ((*pixels)[starttom_row_idx][x] == 255)
+        if ((*pixels)[bottom_row_idx][x] == 255)
         {
             region_size += 1;
         }
@@ -73,7 +73,7 @@ void track_center(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t sta
     }
     uint16_t track_center_new = region_largest_start + (region_largest_size / 2);
     track_center_push(track_center_new);
-    draw_square(pixels, (point2_t){track_center_compute(), starttom_row_idx}, 10, 100);
+    draw_square(pixels, (point2_t){track_center_compute(), bottom_row_idx}, 10, 100);
 }
 
 static uint8_t shoot_ray_callback(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t point)
@@ -86,11 +86,10 @@ static uint8_t shoot_ray_callback(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SI
     {
         return -1;
     }
-    draw_square(pixels, point, 1, 120);
     return 0;
 }
 
-static point2_t shoot_ray(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t const start, vec2_t const dir)
+static uint16_t shoot_ray(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t const start, vec2_t const dir)
 {
     /* How much to stretch the direction vector so it touches the frame border. */
     float const edge_stretch_x = dir.x < 0 ? start.x / fabs((float)dir.x) : (TCO_SIM_WIDTH - start.x) / fabs((float)dir.x);
@@ -111,17 +110,15 @@ static point2_t shoot_ray(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], poin
 
     bresenham(pixels, &shoot_ray_callback, start, end);
 
-    return end;
+    return ray_length_last;
 }
 
-void track_distances(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t starttom_row_idx)
+void track_distances(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t bottom_row)
 {
-    point2_t const start = {200, starttom_row_idx};
+    point2_t const start = {200, bottom_row};
     vec2_t const dir = {40, -20};
-    point2_t const hit = shoot_ray(pixels, start, dir);
+    uint16_t const ray_length = shoot_ray(pixels, start, dir);
 
     draw_square(pixels, start, 10, 120);
     draw_square(pixels, (point2_t){start.x + dir.x, start.y + dir.y}, 10, 120);
-    log_debug("drawing end: %u %u", hit.x, hit.y);
-    draw_square(pixels, hit, 10, 120);
 }
