@@ -31,22 +31,23 @@ void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_
         int32_t const draw_y = point_y - radius;
         if (draw_y + y < 0 || draw_y + y >= TCO_SIM_HEIGHT)
         {
+            /* When outside the frame. */
             continue;
         }
 
         int32_t const draw_x_left_offset = point_x - radius < 0 ? -(point_x - radius) : 0;
-        int32_t const draw_x_right_offset = point_x + radius >= TCO_SIM_HEIGHT ? (point_x + radius) - TCO_SIM_HEIGHT : 0;
+        int32_t const draw_x_right_offset = point_x + radius >= TCO_SIM_WIDTH ? (point_x + radius) - TCO_SIM_WIDTH : 0;
         int32_t const draw_x = point_x + draw_x_left_offset - draw_x_right_offset - radius;
         if (draw_x < 0)
         {
-            /* When frame is too small for square */
-            return;
+            /* When frame is too small for square. */
+            continue;
         }
         int32_t const draw_width = size - draw_x_right_offset - draw_x_left_offset;
         if (draw_width < 0)
         {
-            /* When frame is too small for square */
-            return;
+            /* When frame is too small for square. */
+            continue;
         }
 
         memcpy(&(*pixels)[draw_y + y][draw_x], square_row, draw_width);
