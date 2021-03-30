@@ -148,7 +148,7 @@ static GstFlowReturn handle_new_sample(GstElement *sink, gst_pipeline_t *pipelin
         {
             /* Pass the frame to the user callback. */
             cam_user_data_t *user_data = (cam_user_data_t *)pipeline_info->user_data;
-            user_data->frame_processor_data.func((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])info.data + 1, info.size, user_data->frame_processor_data.args);
+            user_data->frame_processor_data.func((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])info.data, info.size, user_data->frame_processor_data.args);
         }
         else
         {
