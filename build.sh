@@ -12,6 +12,7 @@ clang \
     -Wall \
     -std=c11 \
     -I ../code \
+    -I ../code/utils \
     -I ../lib/tco_libd/include \
     -I ../lib/tco_shmem \
     -I /usr/lib/aarch64-linux-gnu/glib-2.0/include \
@@ -26,6 +27,7 @@ clang \
     -D TRAINING \
     `pkg-config --cflags --libs gstreamer-1.0` \
     ../code/*.c \
+    ../code/utils/*.c \
     tco_libd.a \
     -o tco_pland.bin
 popd
