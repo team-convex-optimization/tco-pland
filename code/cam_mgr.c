@@ -293,8 +293,9 @@ static void register_signal_handler(void)
  * work as expected.
  * @note This function should be called once all children threads are created but where the main
  * thead is not joined to any of the children threads.
+ * @param user_deinit User defined deinit function that will be run before closing.
  */
-static void detect_and_handle_exit_requested(void)
+static void detect_and_handle_exit_requested(int (*user_deinit)(void))
 {
     /* 100ms but not exactly due to granularity of the clock hence the 'rem' pointer passed to
     'nanosleep' */
@@ -331,6 +332,10 @@ static void detect_and_handle_exit_requested(void)
             log_error("Failed to destroy mutex for accessing processed frame data");
         }
     }
+    if (user_deinit() != 0)
+    {
+        log_error("User defined deinit function failed");
+    }
 }
 
 /**
@@ -341,9 +346,12 @@ static void detect_and_handle_exit_requested(void)
  * main thread.
  * @param proc_func A function which will process a frame and use its data in any way it wants.
  * @param proc_func_args Pointer to arguments which will be passed to proc_fucn when it is called.
+ * @param user_deinit User defined deinit function that will be run before closing.
+ * @return 0 on success and 1 on failure
  */
-static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args)
+static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args, int (*user_deinit)(void))
 {
+    // TODO: Make this function handle user deinit correctly e.g. by running camera pipeline in a separate thread then polling for requested exit
     compute_user_data.f = proc_func;
     compute_user_data.args = proc_func_args;
     cam_user_data_t user_data = {{frame_raw_processor, &compute_user_data}, {NULL, NULL}};
@@ -366,8 +374,10 @@ static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_F
  * window.
  * @param proc_func A function which will process a frame and use its data in any way it wants.
  * @param proc_func_args Pointer to arguments which will be passed to proc_fucn when it is called.
+ * @param user_deinit User defined deinit function that will be run before closing.
+ * @return 0 on success and 1 on failure
  */
-static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args)
+static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args, int (*user_deinit)(void))
 {
     using_threads = 1;
     register_signal_handler();
@@ -408,18 +418,18 @@ static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FR
         return EXIT_FAILURE;
     }
 
-    detect_and_handle_exit_requested();
+    detect_and_handle_exit_requested(user_deinit);
     return EXIT_SUCCESS;
 }
 
-int cam_mgr_run(uint8_t real_or_sim, void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args)
+int cam_mgr_run(uint8_t real_or_sim, void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args, int (*user_deinit)(void))
 {
     if (real_or_sim)
     {
-        return run_camera_real(proc_func, proc_func_args);
+        return run_camera_real(proc_func, proc_func_args, user_deinit);
     }
     else
     {
-        return run_camera_sim(proc_func, proc_func_args);
+        return run_camera_sim(proc_func, proc_func_args, user_deinit);
     }
 }

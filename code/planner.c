@@ -1,13 +1,26 @@
 #include <stdio.h>
+#include <stdlib.h>
+
 #include <string.h>
 #include <math.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #include "tco_libd.h"
+#include "tco_shmem.h"
 
-#include "trajection.h"
+#include "planner.h"
 #include "draw.h"
 #include "sort.h"
 #include "misc.h"
+#include "lin_alg.h"
+
+static struct tco_shmem_data_training *shmem_training;
+static sem_t *shmem_sem_training;
+static struct tco_shmem_data_plan *shmem_plan;
+static sem_t *shmem_sem_plan;
+static uint8_t shmem_training_open = 0;
+static uint8_t shmem_plan_open = 0;
 
 static uint8_t const TRACK_CENTER_COUNT = 4;
 static uint16_t track_centers[TRACK_CENTER_COUNT] = {0};
@@ -43,7 +56,7 @@ static uint16_t track_center_compute()
     return median;
 }
 
-point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx)
+static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx)
 {
     uint16_t region_largest_size = 0;
     uint16_t region_largest_start = 0;
@@ -77,10 +90,11 @@ point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]
     return center;
 }
 
-static uint8_t shoot_ray_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
     if ((*pixels)[point.y][point.x] != 255)
     {
+        (*pixels)[point.y][point.x] = 120;
         ray_length_last += 1;
         ray_hit.x = point.x;
         ray_hit.y = point.y;
@@ -89,7 +103,7 @@ static uint8_t shoot_ray_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_
     return -1;
 }
 
-static uint16_t shoot_ray(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, vec2_t const dir)
+static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, vec2_t const dir)
 {
     draw_square(pixels, start, 10, 120);
     /* How much to stretch the direction vector so it touches the frame border. */
@@ -108,21 +122,82 @@ static uint16_t shoot_ray(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
 
     log_debug("end %u %u", end.x, end.y);
 
-    bresenham(pixels, &shoot_ray_callback, start, end);
+    bresenham(pixels, &raycast_callback, start, end);
     draw_square(pixels, ray_hit, 10, 120);
 
     return ray_length_last;
 }
 
-void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
+static void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
-    shoot_ray(pixels, center, (vec2_t){0, -3});
-    shoot_ray(pixels, center, (vec2_t){1, -3});
-    shoot_ray(pixels, center, (vec2_t){-1, -3});
-    shoot_ray(pixels, center, (vec2_t){2, -3});
-    shoot_ray(pixels, center, (vec2_t){-2, -3});
-    shoot_ray(pixels, center, (vec2_t){3, -3});
-    shoot_ray(pixels, center, (vec2_t){-3, -3});
-    shoot_ray(pixels, center, (vec2_t){4, -3});
-    shoot_ray(pixels, center, (vec2_t){-4, -3});
+    raycast(pixels, center, (vec2_t){0, -3});
+    raycast(pixels, center, (vec2_t){1, -3});
+    raycast(pixels, center, (vec2_t){-1, -3});
+    raycast(pixels, center, (vec2_t){2, -3});
+    raycast(pixels, center, (vec2_t){-2, -3});
+    raycast(pixels, center, (vec2_t){3, -3});
+    raycast(pixels, center, (vec2_t){-3, -3});
+    raycast(pixels, center, (vec2_t){4, -3});
+    raycast(pixels, center, (vec2_t){-4, -3});
+}
+
+int plnr_init()
+{
+    if (shmem_map(TCO_SHMEM_NAME_TRAINING, TCO_SHMEM_SIZE_TRAINING, TCO_SHMEM_NAME_SEM_TRAINING, O_RDONLY, (void **)&shmem_training, &shmem_sem_training) != 0)
+    {
+        log_error("Failed to map training shmem into process memory");
+        return EXIT_FAILURE;
+    }
+    if (shmem_map(TCO_SHMEM_NAME_PLAN, TCO_SHMEM_SIZE_PLAN, TCO_SHMEM_NAME_SEM_PLAN, O_RDWR, (void **)&shmem_plan, &shmem_sem_plan) != 0)
+    {
+        log_error("Failed to map planning shmem into process memory");
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
+{
+    point2_t const center = track_center(pixels, 210);
+    track_distances(pixels, center);
+
+    if (sem_wait(shmem_sem_plan) == -1)
+    {
+        log_error("sem_wait: %s", strerror(errno));
+        return EXIT_FAILURE;
+    }
+    shmem_plan_open = 1;
+    /* START: Critical section */
+    shmem_plan->valid = 1;
+    shmem_plan->waypts[0][0] = center.x;
+    shmem_plan->waypts[0][1] = center.y;
+    /* END: Critical section */
+    if (sem_post(shmem_sem_plan) == -1)
+    {
+        log_error("sem_post: %s", strerror(errno));
+        return EXIT_FAILURE;
+    }
+    shmem_plan_open = 0;
+    return EXIT_SUCCESS;
+}
+
+int plnr_deinit()
+{
+    if (shmem_plan_open)
+    {
+        if (sem_post(shmem_sem_plan) == -1)
+        {
+            log_error("sem_post: %s", strerror(errno));
+            return EXIT_FAILURE;
+        }
+    }
+    if (shmem_training_open)
+    {
+        if (sem_post(shmem_sem_training) == -1)
+        {
+            log_error("sem_post: %s", strerror(errno));
+            return EXIT_FAILURE;
+        }
+    }
+    return EXIT_SUCCESS;
 }
