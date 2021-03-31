@@ -18,7 +18,7 @@
 */
 typedef struct cam_mgr_user_data_t
 {
-    void (*f)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *);
+    void (*f)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *);
     void *args;
     struct timespec frame_end_times[2]; /* Hold times measured at end of a frame. */
 } cam_mgr_user_data_t;
@@ -26,11 +26,11 @@ typedef struct cam_mgr_user_data_t
 static struct tco_shmem_data_training *training_data;
 static sem_t *training_data_sem;
 static uint8_t shmem_open = 0; /* To ensure that semaphor is never left at 0 when forcing the app to exit. */
-static uint32_t const frame_size_expected = TCO_SIM_WIDTH * TCO_SIM_HEIGHT * sizeof(uint8_t);
+static uint32_t const frame_size_expected = TCO_FRAME_WIDTH * TCO_FRAME_HEIGHT * sizeof(uint8_t);
 
 /* This will be accessed by multiple threads. The alignment is there to avoid problems when using
 memcpy with this address. */
-static uint8_t __attribute__((aligned(32))) frame_processed[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {{0}};
+static uint8_t __attribute__((aligned(32))) frame_processed[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
 static pthread_mutex_t frame_processed_mutex;
 
 static uint8_t using_threads = 0;
@@ -57,19 +57,19 @@ static void handle_signals(int sig)
  * @param length The length of the 'pixel_dest' array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
  */
-static void frame_test_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
+static void frame_test_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args_ptr)
 {
     static float offset = 0.0;           /* Offset of the gradient along the diagonal as a fraction of the diagonal length. */
     const float pix_val_white = 255.0f;  /* 0=black, 255=white. */
     const float speed_scrolling = 0.01f; /* As a fraction of the diagonal length per frame. */
     float pix_offset;
-    for (uint16_t y = 0; y < TCO_SIM_HEIGHT; y++)
+    for (uint16_t y = 0; y < TCO_FRAME_HEIGHT; y++)
     {
-        for (uint16_t x = 0; x < TCO_SIM_WIDTH; x++)
+        for (uint16_t x = 0; x < TCO_FRAME_WIDTH; x++)
         {
             /* Fraction from upper left corner along the diagonal (1 = bottom right corner, 0 = top
             left corner). */
-            pix_offset = ((x / TCO_SIM_WIDTH) + (y / TCO_SIM_HEIGHT)) / 2;
+            pix_offset = ((x / TCO_FRAME_WIDTH) + (y / TCO_FRAME_HEIGHT)) / 2;
             /* An offset is in the range of [0..1] where at 0 upper left corner is all black and
             gradient moves diagonally until white in the bottom right. Offset equal to 1 means the
             upper left corner is white and bottom right corner is black. */
@@ -95,7 +95,7 @@ static void frame_test_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WI
  * @param length The size of the pixels array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_processor_t' args field.
  */
-static void frame_raw_processor(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
+static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args_ptr)
 {
     static uint16_t fps_now = 0;
     static uint16_t fps_counter = 0; /* Number of frames that passed in the current second. */
@@ -109,7 +109,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]
     /* This is an array which holds a copy of the processed frame. This is done because nothing can
     be guaranteed about the 'pixels' pointer (it could even be read-only). Needs to be aligned in
     order for memcpy to be used. */
-    uint8_t __attribute__((aligned(32))) frame_processed_tmp[TCO_SIM_HEIGHT][TCO_SIM_WIDTH] = {{0}};
+    uint8_t __attribute__((aligned(32))) frame_processed_tmp[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
     /* Process image here by modifying 'frame_processed_tmp'. */
@@ -166,7 +166,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]
  * @param length The size of the pixels array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
  */
-static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
+static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args_ptr)
 {
     if (frame_size_expected != length)
     {
@@ -209,7 +209,7 @@ static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WID
  * @param length The size of the pixels array in bytes.
  * @param args_ptr Pointer to user data in particular the 'frame_injector_t' args field.
  */
-static void frame_processed_injector(uint8_t (*pixel_dest)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args_ptr)
+static void frame_processed_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args_ptr)
 {
     if (frame_size_expected != length)
     {
@@ -342,7 +342,7 @@ static void detect_and_handle_exit_requested(void)
  * @param proc_func A function which will process a frame and use its data in any way it wants.
  * @param proc_func_args Pointer to arguments which will be passed to proc_fucn when it is called.
  */
-static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *), void *proc_func_args)
+static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args)
 {
     compute_user_data.f = proc_func;
     compute_user_data.args = proc_func_args;
@@ -367,7 +367,7 @@ static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM
  * @param proc_func A function which will process a frame and use its data in any way it wants.
  * @param proc_func_args Pointer to arguments which will be passed to proc_fucn when it is called.
  */
-static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *), void *proc_func_args)
+static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args)
 {
     using_threads = 1;
     register_signal_handler();
@@ -412,7 +412,7 @@ static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_
     return EXIT_SUCCESS;
 }
 
-int cam_mgr_run(uint8_t real_or_sim, void (*proc_func)(uint8_t (*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int, void *), void *proc_func_args)
+int cam_mgr_run(uint8_t real_or_sim, void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args)
 {
     if (real_or_sim)
     {

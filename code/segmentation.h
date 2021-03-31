@@ -9,6 +9,6 @@
  * @param image a grayscale image which segments the image. 
  * @return the image is passed by reference. This reference is modified. 
  */
-void segment(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH]);
+void segment(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]);
 
 #endif /* _SEGMENTATION_H_ */

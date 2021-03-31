@@ -14,18 +14,18 @@
 const int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 const int draw_enabled = 1;
 
-void proc_func(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], int length, void *args)
+void proc_func(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args)
 {
-  for (size_t y = 211; y < TCO_SIM_HEIGHT; y++)
+  for (size_t y = 211; y < TCO_FRAME_HEIGHT; y++)
   {
-    for (size_t x = 0; x < TCO_SIM_WIDTH; x++)
+    for (size_t x = 0; x < TCO_FRAME_WIDTH; x++)
     {
       (*pixels)[y][x] = 0;
     }
   }
   segment(pixels);
-  track_distances(pixels, 210);
-  // track_center(pixels, 210);
+  point2_t const center = track_center(pixels, 210);
+  track_distances(pixels, center);
 }
 
 int main(int argc, char *argv[])

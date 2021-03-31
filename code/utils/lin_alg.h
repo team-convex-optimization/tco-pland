@@ -15,4 +15,11 @@ typedef struct vec2_t
     int16_t y;
 } vec2_t;
 
+typedef struct matf_t
+{
+    float *data;
+    uint8_t row_n;
+    uint8_t col_n;
+} matf_t;
+
 #endif /* _LINALG_H_ */

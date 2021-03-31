@@ -14,8 +14,8 @@
  * @param end Where the line should end.
  * @note A customized version of https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm.
  */
-void bresenham(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH],
-               uint8_t (*pixel_action)(uint8_t (*const)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t const),
+void bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
+               uint8_t (*pixel_action)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const),
                point2_t const start,
                point2_t const end);
 

@@ -2,10 +2,11 @@
 #define _TRAJECTION_H_
 
 #include <stdint.h>
-#include "tco_shmem.h" /* For Image_bounds defintions */
+#include "tco_shmem.h"
+#include "lin_alg.h"
 
-void track_center(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t bottom_row_idx);
+point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx);
 
-void track_distances(uint8_t (*pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t bottom_row_idx);
+void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center);
 
 #endif /* _TRAJECTION_H_ */

@@ -72,14 +72,14 @@ static gboolean push_data(gst_pipeline_t *pipeline_info)
     GstFlowReturn ret;
     GstMapInfo map; /* For storing information about a memory map. */
     guint8 *frame_raw;
-    uint32_t frame_size = TCO_SIM_HEIGHT * TCO_SIM_WIDTH * sizeof(uint8_t);
+    uint32_t frame_size = TCO_FRAME_HEIGHT * TCO_FRAME_WIDTH * sizeof(uint8_t);
 
     /* Create a new empty buffer */
     buffer = gst_buffer_new_and_alloc(frame_size);
 
     gst_buffer_map(buffer, &map, GST_MAP_WRITE);
     frame_raw = map.data;
-    pipeline_info->user_data->frame_injector_data.func((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])frame_raw, frame_size, pipeline_info->user_data->frame_injector_data.args);
+    pipeline_info->user_data->frame_injector_data.func((uint8_t(*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])frame_raw, frame_size, pipeline_info->user_data->frame_injector_data.args);
     gst_buffer_unmap(buffer, &map);
 
     /* Push the buffer into the appsrc */
@@ -148,7 +148,7 @@ static GstFlowReturn handle_new_sample(GstElement *sink, gst_pipeline_t *pipelin
         {
             /* Pass the frame to the user callback. */
             cam_user_data_t *user_data = (cam_user_data_t *)pipeline_info->user_data;
-            user_data->frame_processor_data.func((uint8_t(*)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH])info.data, info.size, user_data->frame_processor_data.args);
+            user_data->frame_processor_data.func((uint8_t(*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])info.data, info.size, user_data->frame_processor_data.args);
         }
         else
         {

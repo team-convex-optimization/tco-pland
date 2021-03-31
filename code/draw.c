@@ -4,19 +4,19 @@
 #include "draw.h"
 #include "tco_libd.h"
 
-void draw_horiz_line(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const row_idx)
+void draw_horiz_line(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const row_idx)
 {
     if (!draw_enabled)
     {
         return;
     }
-    for (uint16_t i = 0; i < TCO_SIM_WIDTH; i++)
+    for (uint16_t i = 0; i < TCO_FRAME_WIDTH; i++)
     {
         (*pixels)[row_idx][i] = 32;
     }
 }
 
-void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_t const point, uint8_t const size, uint8_t const color)
+void draw_square(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point, uint8_t const size, uint8_t const color)
 {
     if (!draw_enabled)
     {
@@ -29,14 +29,14 @@ void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_
     for (uint16_t y = 0; y < size; y++)
     {
         int32_t const draw_y = point.y - radius;
-        if (draw_y + y < 0 || draw_y + y >= TCO_SIM_HEIGHT)
+        if (draw_y + y < 0 || draw_y + y >= TCO_FRAME_HEIGHT)
         {
             /* When outside the frame. */
             continue;
         }
 
         int32_t const draw_x_left_offset = point.x - radius < 0 ? -(point.x - radius) : 0;
-        int32_t const draw_x_right_offset = point.x + radius >= TCO_SIM_WIDTH ? (point.x + radius) - TCO_SIM_WIDTH : 0;
+        int32_t const draw_x_right_offset = point.x + radius >= TCO_FRAME_WIDTH ? (point.x + radius) - TCO_FRAME_WIDTH : 0;
         int32_t const draw_x = point.x + draw_x_left_offset - draw_x_right_offset - radius;
         if (draw_x < 0)
         {
@@ -54,7 +54,7 @@ void draw_square(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], point2_
     }
 }
 
-void draw_number(uint8_t (*const pixels)[TCO_SIM_HEIGHT][TCO_SIM_WIDTH], uint16_t const number, point2_t const start)
+void draw_number(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const number, point2_t const start)
 {
     if (!draw_enabled)
     {
