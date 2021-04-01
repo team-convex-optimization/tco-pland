@@ -12,7 +12,7 @@ void find_edges_scan(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint1
         }
     }
     (*edges)[0] = ERR_POINT;
-    right_edge:
+right_edge:
 
     for (uint16_t i = center_width; i > 0 + SEGMENTATION_DEADZONE; i--)
     {
@@ -33,7 +33,7 @@ void plot_line_points(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     uint16_t const center_width = TCO_FRAME_WIDTH / 2;
 
     /* Define scanline points */
-    uint16_t  target_lines[NUM_LINE_POINTS];
+    uint16_t target_lines[NUM_LINE_POINTS];
     for (int i = 0; i < NUM_LINE_POINTS; i++) /* Define the target lines */
     {
         target_lines[i] = ((NUM_LINE_POINTS - i + POINT_OFFSET) * TCO_FRAME_HEIGHT) / (POINT_MULTIPLIER * NUM_LINE_POINTS);
@@ -54,13 +54,10 @@ void plot_line_points(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     }
 
     /* Show the target_lines */
-    // if (draw_enabled)
-    // {
-    //     for (int i = 0; i < NUM_LINE_POINTS; i++)
-    //     {
-    //         draw_line_horiz(pixels, target_lines[i]);
-    //     }
-    // }
+    for (int i = 0; i < NUM_LINE_POINTS; i++)
+    {
+        draw_line_horiz(pixels, target_lines[i]);
+    }
 
     line_t *lines = calculate_line(pixels, &target_lines, &edges); /* Calculate where the line is TODO: Make this return the line*/
 
