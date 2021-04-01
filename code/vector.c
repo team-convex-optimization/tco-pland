@@ -1,9 +1,5 @@
 #include "vector.h"
-#include "segmentation.h"
 #include "draw.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 
 void find_edges_scan(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t center_width, uint16_t height, uint16_t (*edges)[2])
 {
@@ -16,7 +12,7 @@ void find_edges_scan(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint1
         }
     }
     (*edges)[0] = ERR_POINT;
-right_edge:
+    right_edge:
 
     for (uint16_t i = center_width; i > 0 + SEGMENTATION_DEADZONE; i--)
     {
@@ -34,36 +30,17 @@ void plot_vector_points(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     /* Take scanline for firstrow at bottom. Then go up an increment and spread from center of last 2 points, looking for next point.
         Do this and there should be a series of points that are on the line! */
-    const uint16_t center_width = TCO_FRAME_WIDTH / 2;
+    uint16_t const center_width = TCO_FRAME_WIDTH / 2;
 
-    const uint16_t target_lines[NUM_VECTOR_POINTS] = {
-        //TODO : Dynamically initialize me.
-        (28 * TCO_FRAME_HEIGHT) / 72, /* Closest to the car */
-        (27 * TCO_FRAME_HEIGHT) / 72,
-        (26 * TCO_FRAME_HEIGHT) / 72,
-        (25 * TCO_FRAME_HEIGHT) / 72,
-        (24 * TCO_FRAME_HEIGHT) / 72,
-        (23 * TCO_FRAME_HEIGHT) / 72,
-        (22 * TCO_FRAME_HEIGHT) / 72,
-        (21 * TCO_FRAME_HEIGHT) / 72,
-        (20 * TCO_FRAME_HEIGHT) / 72,
-        (19 * TCO_FRAME_HEIGHT) / 72,
-        (18 * TCO_FRAME_HEIGHT) / 72,
-        (17 * TCO_FRAME_HEIGHT) / 72,
-        (16 * TCO_FRAME_HEIGHT) / 72,
-        (15 * TCO_FRAME_HEIGHT) / 72,
-        (14 * TCO_FRAME_HEIGHT) / 72,
-        (13 * TCO_FRAME_HEIGHT) / 72,
-        (12 * TCO_FRAME_HEIGHT) / 72,
-        (11 * TCO_FRAME_HEIGHT) / 72,
-        (10 * TCO_FRAME_HEIGHT) / 72,
-        (9 * TCO_FRAME_HEIGHT) / 72,
-        (8 * TCO_FRAME_HEIGHT) / 72,
-        (7 * TCO_FRAME_HEIGHT) / 72,
-        (6 * TCO_FRAME_HEIGHT) / 72,
-        (5 * TCO_FRAME_HEIGHT) / 72,
-    };
+    /* Define scanline points */
+    uint16_t  target_lines[NUM_VECTOR_POINTS];
+    for (int i = 0; i < NUM_VECTOR_POINTS; i++) /* Define the target lines */
+    {
+        target_lines[i] = ((NUM_VECTOR_POINTS - i + LINE_OFFSET) * TCO_FRAME_HEIGHT) / (LINE_MULTIPLIER * NUM_VECTOR_POINTS);
+    }
+
     uint16_t edges[NUM_VECTOR_POINTS][2];
+
     /* Find the bottom line */
     find_edges_scan(pixels, center_width, target_lines[0], &edges[0]);
 
@@ -76,26 +53,31 @@ void plot_vector_points(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
         }
     }
 
-/* Show the target_lines */
-#ifdef DRAW
-    for (int i = 0; i < NUM_VECTOR_POINTS; i++)
-        show_target_lines(pixels, target_lines[i]);
-#endif
+    /* Show the target_lines */
+    // if (draw_enabled)
+    // {
+    //     for (int i = 0; i < NUM_VECTOR_POINTS; i++)
+    //     {
+    //         draw_line_horiz(pixels, target_lines[i]);
+    //     }
+    // }
 
-    vector *vectors = calculate_vector(pixels, &target_lines, &edges); /* Calculate where the vector is TODO: Make this return the vector*/
+    vector_t *vectors = calculate_vector(pixels, &target_lines, &edges); /* Calculate where the vector is TODO: Make this return the vector*/
 
-#ifdef DRAW /* Plot vector points */
-    for (uint16_t e = 0; e < 2; e++)
+    if (draw_enabled)
     {
-        if (vectors[e].valid == 0)
-            break;
-        draw_line_horiz(pixels, vectors[e].bot.x, vectors[e].bot.y, vectors[e].top.x, vectors[e].top.y, 64);
-        draw_square(pixels, vectors[e].bot.x, vectors[e].bot.y, 8, 32);
-        draw_square(pixels, vectors[e].top.x, vectors[e].top.y, 8, 32);
+        for (uint16_t e = 0; e < 2; e++)
+        {
+            if (vectors[e].valid == 0)
+            {
+                break;
+            }
+            // draw_line(pixels, vectors[e].bot.x, vectors[e].bot.y, vectors[e].top.x, vectors[e].top.y, 64); //TODO : Use raycast call
+            draw_square(pixels, vectors[e].bot, 8, 64);
+            draw_square(pixels, vectors[e].top, 8, 64);
+        }
     }
-#endif
 
-    /* TODO : Don't forget to free the vectors! */
     free(vectors);
 }
 
@@ -105,16 +87,18 @@ uint8_t diff(uint16_t a, uint16_t b)
     return a < b ? b - a : a - b;
 }
 
-vector *calculate_vector(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], const uint16_t (*target_lines)[NUM_VECTOR_POINTS], const uint16_t (*edges)[NUM_VECTOR_POINTS][2])
+vector_t *calculate_vector(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const (*target_lines)[NUM_VECTOR_POINTS], uint16_t const (*edges)[NUM_VECTOR_POINTS][2])
 {
-    vector *vectors = calloc(sizeof(vector), 2);
+    vector_t *vectors = calloc(sizeof(vector_t), 2);
     for (uint8_t e = 0; e < 2; e++)
     {
         uint8_t bot_found = 0; /* Keep track if bottom vector has been found */
         for (int8_t i = 0; i < NUM_VECTOR_POINTS; i++)
         {
             if ((*edges)[i][e] == ERR_POINT) /* Skip points that are out of bounds */
+            {
                 continue;
+            }
 
             if (bot_found == 0) /* Bottom not (yet) found */
             {
