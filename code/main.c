@@ -10,7 +10,7 @@
 #include "segmentation.h"
 #include "planner.h"
 #include "draw.h"
-#include "line.h"
+#include "edge_scan.h"
 
 const int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 const int draw_enabled = 1;
@@ -28,7 +28,7 @@ void user_proc_func(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int le
   }
   segment(pixels);
   // plnr_step(pixels);
-  plot_line_points(pixels);
+  edge_plot(pixels);
 }
 
 int user_deinit()
