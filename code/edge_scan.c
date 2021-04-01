@@ -1,12 +1,15 @@
 #include "edge_scan.h"
 #include "draw.h"
 
+
 /****************************
  * UTILITY FUNCTION PROTOTYPES
  ****************************/
 void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS],
                 point2_t const (*right_edges)[NUM_LINE_POINTS], line_t const *lines);
 uint8_t diff(uint16_t a, uint16_t b);
+void draw_next_way_point(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], line_t const *lines);
+
 
 /****************************
  * LINE FINDING FUNCTIONS
@@ -67,6 +70,7 @@ void edge_plot(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 
     /* Draw the lines */
     draw_edges(pixels, &left_edges, &right_edges, lines);
+    draw_next_way_point(pixels, lines);
 
     free(lines);
 }
@@ -142,4 +146,23 @@ void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t c
 uint8_t diff(uint16_t a, uint16_t b)
 {
     return a < b ? b - a : a - b;
+}
+
+/* Utility function to draw next best point */
+void draw_next_way_point(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], line_t const *lines)
+{
+    line_t left_line = *(lines);
+    line_t right_line = *(lines + 1);
+    
+    line_t avg_point;
+    avg_point.bot.x = (left_line.bot.x + right_line.bot.x)/2;
+    avg_point.top.x = (left_line.top.x + right_line.top.x)/2;
+    avg_point.bot.y = (left_line.bot.y + right_line.bot.y)/2;
+    avg_point.top.y = (left_line.top.y + right_line.top.y)/2;
+
+    point2_t way_point;
+    way_point.x = (avg_point.top.x + avg_point.bot.x)/2;
+    way_point.y = (avg_point.top.y + avg_point.bot.y)/2;
+    draw_q_square(way_point, 10, 128);
+
 }
