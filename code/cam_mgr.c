@@ -30,7 +30,7 @@ static uint32_t const frame_size_expected = TCO_FRAME_WIDTH * TCO_FRAME_HEIGHT *
 
 /* This will be accessed by multiple threads. The alignment is there to avoid problems when using
 memcpy with this address. */
-static uint8_t __attribute__((aligned(32))) frame_processed[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
+static _Alignas(4) uint8_t frame_processed[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
 static pthread_mutex_t frame_processed_mutex;
 
 static uint8_t using_threads = 0;
@@ -109,15 +109,17 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
     /* This is an array which holds a copy of the processed frame. This is done because nothing can
     be guaranteed about the 'pixels' pointer (it could even be read-only). Needs to be aligned in
     order for memcpy to be used. */
-    uint8_t __attribute__((aligned(32))) frame_processed_tmp[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
+    _Alignas(4) uint8_t frame_processed_tmp[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
     /* Process image here by modifying 'frame_processed_tmp'. */
+    draw_init(&frame_processed_tmp);
     cam_mgr_user_data_t *compute_user_data = args_ptr;
     compute_user_data->f(&frame_processed_tmp, frame_size_expected, compute_user_data->args);
 
     /* Measure FPS. */
-    draw_number(&frame_processed_tmp, fps_now, (point2_t){10, 10});
+    draw_q_number(fps_now, (point2_t){10, 10}, 4);
+    draw_run(); /* XXX: Is there a better place to put this. */
     if (fps_counter == 0)
     {
         clock_gettime(CLOCK_REALTIME, &compute_user_data->frame_end_times[0]);
@@ -135,7 +137,6 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
         memset(&compute_user_data->frame_end_times[0], 0, sizeof(struct timespec));
         memset(&compute_user_data->frame_end_times[1], 0, sizeof(struct timespec));
         fps_counter = 0;
-        log_debug("fps: %u", fps_now);
     }
     else
     {

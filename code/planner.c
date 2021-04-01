@@ -105,31 +105,46 @@ static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
 
 static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, vec2_t const dir)
 {
-    draw_square(pixels, start, 10, 120);
+    draw_q_square(start, 10, 120);
     /* How much to stretch the direction vector so it touches the frame border. */
     float const edge_stretch_x = dir.x < 0 ? start.x / fabs((float)dir.x) : (TCO_FRAME_WIDTH - start.x) / fabs((float)dir.x);
-    log_debug("edge stretch x: %f", edge_stretch_x);
     float const edge_stretch_y = dir.y < 0 ? start.y / fabs((float)dir.y) : (TCO_FRAME_HEIGHT - start.y) / fabs((float)dir.y);
-    log_debug("edge stretch y: %f", edge_stretch_y);
-
     float const edge_stretch = edge_stretch_y < edge_stretch_x ? edge_stretch_y : edge_stretch_x;
-    log_debug("selected edge stretch: %f", edge_stretch);
 
     /* A direction vector which when added to start goes to the border of the frame while keeping angle. */
     vec2_t const dir_stretched = {dir.x * edge_stretch, dir.y * edge_stretch};
-    log_debug("dir stretched %i %i, startx: %u %u, +: %u %u", dir_stretched.x, dir_stretched.y, start.x, start.y, start.x + dir_stretched.x, start.y + dir_stretched.y);
     point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
 
-    log_debug("end %u %u", end.x, end.y);
-
     bresenham(pixels, &raycast_callback, start, end);
-    draw_square(pixels, ray_hit, 10, 120);
+    draw_q_square(ray_hit, 10, 120);
 
     return ray_length_last;
 }
 
+static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t hops_n, uint8_t cw_or_ccw)
+{
+    return (point2_t){0, 0};
+}
+
+static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
+{
+    point2_t edge_left = {center.x, center.y};
+    point2_t edge_right = {center.x, center.y};
+    while (edge_left.x > 0 || (*pixels)[edge_left.y][edge_left.x] == 255)
+    {
+        edge_left.x -= 1;
+    }
+    while (edge_right.x < TCO_FRAME_WIDTH || (*pixels)[edge_right.y][edge_right.x] == 255)
+    {
+        edge_right.x += 1;
+    }
+
+    return (vec2_t){center.x, center.y};
+}
+
 static void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
+    // vec2_t dir_track = track_orientation(pixels, center);
     raycast(pixels, center, (vec2_t){0, -3});
     raycast(pixels, center, (vec2_t){1, -3});
     raycast(pixels, center, (vec2_t){-1, -3});

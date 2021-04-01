@@ -4,8 +4,8 @@
 /****************************
  * UTILITY FUNCTION PROTOTYPES
  ****************************/
-void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS], 
-                    point2_t const (*right_edges)[NUM_LINE_POINTS], line_t const *lines);
+void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS],
+                point2_t const (*right_edges)[NUM_LINE_POINTS], line_t const *lines);
 uint8_t diff(uint16_t a, uint16_t b);
 
 /****************************
@@ -63,18 +63,18 @@ void edge_plot(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     }
 
     /* Calculate where the line is TODO: Make this return the line*/
-    line_t *lines = edge_calculate(pixels, &left_edges, &right_edges); 
+    line_t *lines = edge_calculate(pixels, &left_edges, &right_edges);
 
     /* Draw the lines */
     draw_edges(pixels, &left_edges, &right_edges, lines);
-    
+
     free(lines);
 }
 
 line_t *edge_calculate(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS], point2_t const (*right_edges)[NUM_LINE_POINTS])
 {
     line_t *lines = calloc(sizeof(line_t), 2);
-    point2_t const (*edges)[NUM_LINE_POINTS] = left_edges;
+    point2_t const(*edges)[NUM_LINE_POINTS] = left_edges;
     for (uint8_t e = 0; e < 2; e++)
     {
         uint8_t bot_found = 0; /* Keep track if bottom line has been found */
@@ -87,7 +87,7 @@ line_t *edge_calculate(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], poi
 
             if (bot_found == 0) /* Bottom not (yet) found */
             {
-                lines[e].bot.x = (*edges)[i].x;     /* fill in bot_x */
+                lines[e].bot.x = (*edges)[i].x; /* fill in bot_x */
                 lines[e].bot.y = (*edges)[i].y; /* fill in bot_y */
                 bot_found = 1;
             }
@@ -96,9 +96,9 @@ line_t *edge_calculate(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], poi
                 /* If the difference in x is < threshold, accept it. Else, save it */
                 if (diff((*edges)[i - 1].x, (*edges)[i].x) < LINE_TOLERANCE) //TODO : Also keep track of the slope (increasing/decreasing). This might let us increase lenience.S
                 {
-                    lines[e].top.x = (*edges)[i].x;     /* fill in top_x */
+                    lines[e].top.x = (*edges)[i].x; /* fill in top_x */
                     lines[e].top.y = (*edges)[i].y; /* fill in top_y */
-                    lines[e].valid = 1;                  /* WE FOUND A LINE! */
+                    lines[e].valid = 1;             /* WE FOUND A LINE! */
                 }
                 else
                 {
@@ -112,19 +112,18 @@ line_t *edge_calculate(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], poi
     return lines;
 }
 
-
 /****************************
  * UTILITY FUNCTION DEFINTIONS
  ****************************/
 
 /* Utitlity function to draw the points */
-void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS], 
-                    point2_t const (*right_edges)[NUM_LINE_POINTS], line_t const *lines)
+void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS],
+                point2_t const (*right_edges)[NUM_LINE_POINTS], line_t const *lines)
 {
     /* Show the target_lines. In this file, left and right edges have the same y */
     for (int i = 0; i < NUM_LINE_POINTS; i++)
     {
-        draw_line_horiz(pixels, (*left_edges)[i].y);
+        draw_q_line_horiz((*left_edges)[i].y, 50);
     }
 
     for (uint16_t e = 0; e < 2; e++)
@@ -134,10 +133,9 @@ void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t c
             break;
         }
         // draw_line(pixels, lines[e].bot.x, lines[e].bot.y, lines[e].top.x, lines[e].top.y, 64); //TODO : Use raycast call
-        draw_square(pixels, lines[e].bot, 8, 64);
-        draw_square(pixels, lines[e].top, 8, 64);
+        draw_q_square(lines[e].bot, 8, 64);
+        draw_q_square(lines[e].top, 8, 64);
     }
-
 }
 
 /* Utility function to find absolute difference of 2 values */

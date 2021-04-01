@@ -4,24 +4,46 @@
 #include "draw.h"
 #include "tco_libd.h"
 
-void draw_line_horiz(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const row_idx)
+static uint8_t (*target_frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH];
+
+/* Types used in the draw queue. */
+typedef struct line_horiz
 {
-    if (!draw_enabled)
-    {
-        return;
-    }
-    for (uint16_t i = 0; i < TCO_FRAME_WIDTH; i++)
-    {
-        (*pixels)[row_idx][i] = 32;
-    }
+    uint16_t y;
+    uint8_t color;
+} line_horiz_t;
+typedef struct square
+{
+    point2_t center;
+    uint8_t size;
+    uint8_t color;
+} square_t;
+typedef struct number
+{
+    point2_t start;
+    uint16_t number;
+    uint8_t scale;
+} number_t;
+
+static const uint16_t queue_size_line_horiz = 256;
+static line_horiz_t queue_line_horiz[queue_size_line_horiz] = {0};
+static uint8_t queue_idx_line_horiz = 0;
+
+static const uint16_t queue_size_square = 256;
+static square_t queue_square[queue_size_square] = {0};
+static uint8_t queue_idx_square = 0;
+
+static const uint16_t queue_size_number = 256;
+static number_t queue_number[queue_size_number] = {0};
+static uint8_t queue_idx_number = 0;
+
+static void draw_line_horiz(uint16_t const row_idx, uint8_t const color)
+{
+    memset((*target_frame)[row_idx], color, TCO_FRAME_WIDTH);
 }
 
-void draw_square(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point, uint8_t const size, uint8_t const color)
+static void draw_square(point2_t const point, uint8_t const size, uint8_t const color)
 {
-    if (!draw_enabled)
-    {
-        return;
-    }
     const uint16_t radius = size / 2;
     uint8_t square_row[size];
     memset(square_row, color, size);
@@ -50,17 +72,13 @@ void draw_square(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], poi
             continue;
         }
 
-        memcpy(&(*pixels)[draw_y + y][draw_x], square_row, draw_width);
+        memcpy(&(*target_frame)[draw_y + y][draw_x], square_row, draw_width);
     }
 }
 
-void draw_number(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const number, point2_t const start)
+static void draw_number(uint16_t const number, point2_t const start, uint8_t const scale)
 {
-    if (!draw_enabled)
-    {
-        return;
-    }
-    static const uint8_t digit_scale = 4;   /* How much to scale each digit (scaling is done uniformly in x and y axis). */
+    const uint8_t digit_scale = scale;      /* How much to scale each digit (scaling is done uniformly in x and y axis). */
     static const uint8_t digit_spacing = 4; /* Distance between digits horizontally. */
     static const uint8_t digit_num_max = 5; /* Passed number is limited in size by the uint16_t type. */
     static const uint8_t digit_width = 4;
@@ -173,7 +191,91 @@ void draw_number(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uin
         }
         for (uint8_t row_n = 0; row_n < digit_scale; row_n++)
         {
-            memcpy(&(*pixels)[start.y + (scanline_y * digit_scale) + row_n][start.x], &scanline, scanline_width);
+            memcpy(&(*target_frame)[start.y + (scanline_y * digit_scale) + row_n][start.x], &scanline, scanline_width);
         }
     }
+}
+
+void draw_q_line_horiz(uint16_t const row_idx, uint8_t const color)
+{
+    if (!draw_enabled)
+    {
+        return;
+    }
+    if (queue_idx_line_horiz + 1 >= queue_size_line_horiz)
+    {
+        log_error("Tried queueing a horizontal line with no space in the queue.");
+        return;
+    }
+    line_horiz_t *const el = &queue_line_horiz[++queue_idx_line_horiz];
+    el->y = row_idx;
+    el->color = color;
+}
+
+void draw_q_square(point2_t const center, uint8_t const size, uint8_t const color)
+{
+    if (!draw_enabled)
+    {
+        return;
+    }
+    if (queue_idx_square + 1 >= queue_size_square)
+    {
+        log_error("Tried queueing a square with no space in the queue.");
+        return;
+    }
+    square_t *const el = &queue_square[++queue_idx_square];
+    el->center.x = center.x;
+    el->center.y = center.y;
+    el->size = size;
+    el->color = color;
+}
+
+void draw_q_number(uint16_t const number, point2_t const start, uint8_t const scale)
+{
+    if (!draw_enabled)
+    {
+        return;
+    }
+    if (queue_idx_number + 1 >= queue_size_number)
+    {
+        log_error("Tried queueing a horizontal line with no space in the queue.");
+        return;
+    }
+    number_t *const el = &queue_number[++queue_idx_number];
+    el->start.x = start.x;
+    el->start.y = start.y;
+    el->number = number;
+    el->scale = scale;
+}
+
+void draw_init(uint8_t (*const frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
+{
+    if (!draw_enabled)
+    {
+        return;
+    }
+    target_frame = frame;
+}
+
+void draw_run()
+{
+    if (!draw_enabled)
+    {
+        return;
+    }
+    for (uint16_t square_idx = 0; square_idx <= queue_idx_square; square_idx++)
+    {
+        draw_square(queue_square[square_idx].center, queue_square[square_idx].size, queue_square[square_idx].color);
+    }
+    queue_idx_square = 0;
+    for (uint16_t line_horiz_idx = 0; line_horiz_idx <= queue_idx_line_horiz; line_horiz_idx++)
+    {
+        draw_line_horiz(queue_line_horiz[line_horiz_idx].y, queue_line_horiz[line_horiz_idx].color);
+    }
+    queue_idx_line_horiz = 0;
+    for (uint16_t number_idx = 0; number_idx <= queue_idx_number; number_idx++)
+    {
+        draw_number(queue_number[number_idx].number, queue_number[number_idx].start, queue_number[number_idx].scale);
+    }
+    queue_idx_number = 0;
 }
