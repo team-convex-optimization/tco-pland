@@ -28,7 +28,7 @@ void user_proc_func(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int le
   }
   segment(pixels);
   // plnr_step(pixels);
-  plot_vector_points(pixels);
+  plot_line_points(pixels);
 }
 
 int user_deinit()
