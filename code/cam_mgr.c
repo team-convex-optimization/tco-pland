@@ -30,7 +30,7 @@ static uint32_t const frame_size_expected = TCO_FRAME_WIDTH * TCO_FRAME_HEIGHT *
 
 /* This will be accessed by multiple threads. The alignment is there to avoid problems when using
 memcpy with this address. */
-static _Alignas(4) uint8_t frame_processed[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
+static uint8_t _Alignas(4) frame_processed[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
 static pthread_mutex_t frame_processed_mutex;
 
 static uint8_t using_threads = 0;
@@ -69,7 +69,7 @@ static void frame_test_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAM
         {
             /* Fraction from upper left corner along the diagonal (1 = bottom right corner, 0 = top
             left corner). */
-            pix_offset = ((x / TCO_FRAME_WIDTH) + (y / TCO_FRAME_HEIGHT)) / 2;
+            pix_offset = ((x / (float)TCO_FRAME_WIDTH) + (y / (float)TCO_FRAME_HEIGHT)) / 2.0f;
             /* An offset is in the range of [0..1] where at 0 upper left corner is all black and
             gradient moves diagonally until white in the bottom right. Offset equal to 1 means the
             upper left corner is white and bottom right corner is black. */
@@ -78,7 +78,7 @@ static void frame_test_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAM
             {
                 pix_offset -= 1.0f;
             }
-            (*pixel_dest)[y][x] = (int)(pix_offset * pix_val_white);
+            (*pixel_dest)[y][x] = (uint8_t)(pix_offset * pix_val_white);
         }
     }
     offset += speed_scrolling;
@@ -109,7 +109,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
     /* This is an array which holds a copy of the processed frame. This is done because nothing can
     be guaranteed about the 'pixels' pointer (it could even be read-only). Needs to be aligned in
     order for memcpy to be used. */
-    _Alignas(4) uint8_t frame_processed_tmp[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
+    uint8_t _Alignas(4) frame_processed_tmp[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
     /* Process image here by modifying 'frame_processed_tmp'. */
