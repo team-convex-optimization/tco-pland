@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "tco_shmem.h"
-#include "lin_alg.h"
+#include "tco_linalg.h"
 
 /**
  * @brief General purpose bresenham implementation. It takes in a callback which gets called for

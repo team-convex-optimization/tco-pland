@@ -2,21 +2,31 @@
 #define _LINE_H_
 
 #include <stdint.h>
-#include "tco_shmem.h" /* For Image_bounds defintions */
-#include "utils/lin_alg.h" /* For point and line typedefs */
-#include "segmentation.h"
-#include "draw.h"
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 
+#include <string.h>
+
+#include "tco_shmem.h"
+#include "tco_linalg.h"
+
+#include "segmentation.h"
+#include "draw.h"
+
+typedef struct line
+{
+    uint8_t valid;
+    point2_t bot;
+    point2_t top;
+} line_t;
+
 #define NUM_LINE_POINTS 24
-#define POINT_OFFSET 4 /* The offset of the numerator to search for lines */
+#define POINT_OFFSET 4     /* The offset of the numerator to search for lines */
 #define POINT_MULTIPLIER 3 /* The multiplier for the denominator */
 
 #define ERR_POINT TCO_FRAME_WIDTH + 10 /* The value to set `points` when they are not found */
 #define SEGMENTATION_DEADZONE 20       /* The segmentation we use can sometimes create a white line inbetween horizontal track lines. This is a search offset. */
-#define LINE_TOLERANCE 20          /* Number of pixels to cut as 'slack'. The higher the values, the longer the the lines but less reliable */
+#define LINE_TOLERANCE 20              /* Number of pixels to cut as 'slack'. The higher the values, the longer the the lines but less reliable */
 
 /**
  * @brief will perform 5 line scans and plot the points

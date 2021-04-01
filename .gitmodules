@@ -4,3 +4,6 @@
 [submodule "lib/tco_libd"]
 	path = lib/tco_libd
 	url = https://github.com/team-convex-optimization/tco-libd.git
+[submodule "lib/tco_linalg"]
+	path = lib/tco_linalg
+	url = https://github.com/team-convex-optimization/tco-linalg.git

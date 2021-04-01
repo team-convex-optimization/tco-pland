@@ -8,12 +8,12 @@
 
 #include "tco_libd.h"
 #include "tco_shmem.h"
+#include "tco_linalg.h"
 
 #include "planner.h"
 #include "draw.h"
 #include "sort.h"
 #include "misc.h"
-#include "lin_alg.h"
 
 static struct tco_shmem_data_training *shmem_training;
 static sem_t *shmem_sem_training;

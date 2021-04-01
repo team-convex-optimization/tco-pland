@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "tco_shmem.h"
-#include "lin_alg.h"
+#include "tco_linalg.h"
 
 extern const int draw_enabled;
 
