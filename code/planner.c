@@ -166,11 +166,11 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
         log_error("sem_wait: %s", strerror(errno));
         return EXIT_FAILURE;
     }
-    shmem_plan_open = 1;
     /* START: Critical section */
+    shmem_plan_open = 1;
     shmem_plan->valid = 1;
-    shmem_plan->waypts[0][0] = center.x;
-    shmem_plan->waypts[0][1] = center.y;
+    shmem_plan->target = (center.x / TCO_FRAME_WIDTH) - 1.0f;
+    shmem_plan->frame_id += 1;
     /* END: Critical section */
     if (sem_post(shmem_sem_plan) == -1)
     {
