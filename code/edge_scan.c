@@ -1,19 +1,18 @@
 #include "edge_scan.h"
 #include "draw.h"
 
-
-/****************************
- * UTILITY FUNCTION PROTOTYPES
- ****************************/
 void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS],
                 point2_t const (*right_edges)[NUM_LINE_POINTS], line_t const *lines);
 uint8_t diff(uint16_t a, uint16_t b);
 void draw_next_way_point(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], line_t const *lines);
 
-
-/****************************
- * LINE FINDING FUNCTIONS
- ****************************/
+/**
+ * @brief will perform a line sdcan for left and right points to find track limits. Values are written to left/right_edge
+ * @param pixels a segmented image of the track
+ * @param center_width the pixel value bewteen 0 and TCO_FRAME_WIDTH -1 to search for the left/right edges
+ * @param left_edge a pointer to a point_t for the left side of the track
+ * @param right_edge a pointer to a point_t for the right side of the track
+ */
 void edge_scan(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t center_width, point2_t *left_edge, point2_t *right_edge)
 {
     for (uint16_t i = center_width; i < TCO_FRAME_WIDTH - SEGMENTATION_DEADZONE; i++)
@@ -116,11 +115,12 @@ line_t *edge_calculate(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], poi
     return lines;
 }
 
-/****************************
- * UTILITY FUNCTION DEFINTIONS
- ****************************/
-
-/* Utitlity function to draw the points */
+/**
+ * @brief Draw the track lines and the linescan lines
+ * @param left_edges a pointer to an array of size NUM_LINE_POINTS of points on the left side of the track
+ * @param right_edges a pointer to an array of size NUM_LINE_POINTS of points on the right side of the track*
+ * @param lines  pointer to an array of line_t with 2 lines depicting the track limites
+ */
 void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const (*left_edges)[NUM_LINE_POINTS],
                 point2_t const (*right_edges)[NUM_LINE_POINTS], line_t const *lines)
 {
@@ -142,13 +142,22 @@ void draw_edges(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t c
     }
 }
 
-/* Utility function to find absolute difference of 2 values */
+/**
+ * @brief find absolute difference of 2 values
+ * @param a value one
+ * @param b value two
+ * @return read brief
+*/
 uint8_t diff(uint16_t a, uint16_t b)
 {
     return a < b ? b - a : a - b;
 }
 
-/* Utility function to draw next best point */
+/**
+ * @brief Utility function to draw next best point. 
+ * @param pixels an image
+ * @param lines A pointer to an array of 2 lines depicting the track limites
+*/
 void draw_next_way_point(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], line_t const *lines)
 {
     line_t left_line = *(lines);
