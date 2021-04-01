@@ -4,7 +4,7 @@
 #include "draw.h"
 #include "tco_libd.h"
 
-void draw_horiz_line(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const row_idx)
+void draw_line_horiz(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const row_idx)
 {
     if (!draw_enabled)
     {
