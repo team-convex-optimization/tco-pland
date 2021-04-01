@@ -29,6 +29,11 @@ static uint8_t track_centers_push_idx = 0;
 static uint16_t ray_length_last = 0;
 static point2_t ray_hit = {0, 0};
 
+/**
+ * @brief Push a new track center to the track center list. This handles wrapping around.
+ * @note The list works like a circular buffer.
+ * @param track_center_new The track center to push.
+ */
 static void track_center_push(uint16_t const track_center_new)
 {
     track_centers[(track_centers_push_idx + 1) % TRACK_CENTER_COUNT] = track_center_new;
@@ -36,6 +41,9 @@ static void track_center_push(uint16_t const track_center_new)
     track_centers_push_idx %= TRACK_CENTER_COUNT;
 }
 
+/**
+ * @brief Uses all points in the track center list to find the best current center point.
+ */
 static uint16_t track_center_compute()
 {
     uint16_t track_centers_cpy[TRACK_CENTER_COUNT];
@@ -56,6 +64,12 @@ static uint16_t track_center_compute()
     return median;
 }
 
+/**
+ * @brief Find the track center in the provided frame.
+ * @param pixels The frame where the center will be found.
+ * @param bottomr_row_idx Defines the y index in the frame where the center should be found.
+ * @return Track center.
+ */
 static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx)
 {
     uint16_t region_largest_size = 0;
@@ -90,6 +104,12 @@ static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
     return center;
 }
 
+/**
+ * @brief Runs for ever pixels traced by a raycast.
+ * @param pixels The frame.
+ * @param point Last point of the raycast.
+ * @return 0 if cast should continue and -1 if cast should stop.
+ */
 static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
     if ((*pixels)[point.y][point.x] != 255)
@@ -103,6 +123,13 @@ static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
     return -1;
 }
 
+/**
+ * @brief Start a raycast from a @p start position in the direction of @p dir .
+ * @param pixels Frame where the raycast will be shot.
+ * @param start Where the raycast will begin.
+ * @param dir In what direction the ray will be cast.
+ * @return Length of the raycast.
+ */
 static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, vec2_t const dir)
 {
     draw_q_square(start, 10, 120);
@@ -111,7 +138,8 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
     float const edge_stretch_y = dir.y < 0 ? start.y / fabs((float)dir.y) : (TCO_FRAME_HEIGHT - start.y) / fabs((float)dir.y);
     float const edge_stretch = edge_stretch_y < edge_stretch_x ? edge_stretch_y : edge_stretch_x;
 
-    /* A direction vector which when added to start goes to the border of the frame while keeping angle. */
+    /* A direction vector which when added to start goes to the border of the frame while keeping
+    angle. */
     vec2_t const dir_stretched = {dir.x * edge_stretch, dir.y * edge_stretch};
     point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
 
@@ -121,11 +149,25 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
     return ray_length_last;
 }
 
+/**
+ * @brief Perform radial sweep contour tracing. It will trace at most @p hops_n pixels and will
+ * travel in @p cw_or_ccw (clockwise or counter-clockwise) direction. 
+ * @param pixels The frame.
+ * @param hops_n Max number of traced pixels.
+ * @param cw_or_ccw Begin tracing clockwise or counter-clockwise.
+ * @return Last point traced.
+ */
 static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t hops_n, uint8_t cw_or_ccw)
 {
     return (point2_t){0, 0};
 }
 
+/**
+ * @brief Returns a vector in the forward direction of the track.
+ * @param pixels The frame.
+ * @param center Center point of the track.
+ * @return A vector in the forward direction of the track. No guarantees on magnitude.
+ */
 static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
     point2_t edge_left = {center.x, center.y};
@@ -142,6 +184,11 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
     return (vec2_t){center.x, center.y};
 }
 
+/**
+ * @brief Track distances from the car to the edges of the track.
+ * @param pixels The frame.
+ * @param center Starting point of the raycast.
+ */
 static void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
     // vec2_t dir_track = track_orientation(pixels, center);
