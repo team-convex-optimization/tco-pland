@@ -15,11 +15,11 @@ typedef struct vec2_t
     int16_t y;
 } vec2_t;
 
-typedef struct vector
+typedef struct line
 {
     uint8_t valid;
     point2_t bot;
     point2_t top;
-} vector_t;
+} line_t;
 
 #endif /* _LINALG_H_ */

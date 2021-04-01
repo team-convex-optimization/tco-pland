@@ -10,7 +10,7 @@
 #include "segmentation.h"
 #include "planner.h"
 #include "draw.h"
-#include "vector.h"
+#include "line.h"
 
 const int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
 const int draw_enabled = 1;
