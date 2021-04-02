@@ -27,10 +27,6 @@ static uint8_t const track_center_count = 4;
 static uint16_t track_centers_data[track_center_count] = {0};
 static buf_circ_t track_centers = {track_centers_data, track_center_count, track_center_count - 1, sizeof(uint16_t)};
 
-static uint8_t const track_distances_count = 6;
-static uint16_t track_distances_data[track_distances_count] = {0};
-static buf_circ_t track_distances = {track_distances_data, track_distances_count, track_distances_count - 1, sizeof(uint16_t)};
-
 /* Used in raycasting to communicate between callback and the cast initiating function. */
 static uint16_t ray_length_last = 0;
 static point2_t ray_hit = {0, 0};
@@ -381,7 +377,7 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
  */
 static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
-    point2_t const center_black = {center.x, center.y - 8};
+    point2_t const center_black = {center.x, center.y - 20};
     vec2_t const dir_track = track_orientation(pixels, center_black);
     float const dir_track_inv_length = 1 / sqrt(dir_track.x * dir_track.x + dir_track.y * dir_track.y);
 
@@ -424,8 +420,7 @@ static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRA
     distance_total += raycast(pixels, center_black, dir3);
     distance_total += raycast(pixels, center_black, dir4);
     distance_total /= 5;
-    buf_circ_add(&track_distances, (uint8_t *)&distance_total);
-    return listu16_median(track_distances_data, track_distances_count);
+    return distance_total;
 }
 
 int plnr_init()
@@ -457,7 +452,7 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     /* START: Critical section */
     shmem_plan_open = 1;
     shmem_plan->valid = 1;
-    shmem_plan->target = (center.x / TCO_FRAME_WIDTH) - 1.0f;
+    shmem_plan->target = ((center.x / (float)TCO_FRAME_WIDTH) * 2.0f) - 1.0f;
     shmem_plan->frame_id += 1;
     /* END: Critical section */
     if (sem_post(shmem_sem_plan) == -1)
