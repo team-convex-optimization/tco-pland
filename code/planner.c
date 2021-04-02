@@ -239,7 +239,7 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
  */
 static void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
-    // vec2_t dir_track = track_orientation(pixels, center);
+    vec2_t dir_track = track_orientation(pixels, center);
     raycast(pixels, center, (vec2_t){0, -3});
     raycast(pixels, center, (vec2_t){1, -3});
     raycast(pixels, center, (vec2_t){-1, -3});

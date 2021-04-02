@@ -286,11 +286,12 @@ void draw_run(uint8_t (*const frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     {
         return;
     }
-    for (uint16_t square_idx = 0; square_idx < queue_idx_square; square_idx++)
+
+    for (uint16_t pixel_idx = 0; pixel_idx < queue_idx_pixel; pixel_idx++)
     {
-        draw_square(queue_square[square_idx].center, queue_square[square_idx].size, queue_square[square_idx].color);
+        draw_pixel(queue_pixel[pixel_idx].pos, queue_pixel[pixel_idx].color);
     }
-    queue_idx_square = 0;
+    queue_idx_pixel = 0;
 
     for (uint16_t line_horiz_idx = 0; line_horiz_idx < queue_idx_line_horiz; line_horiz_idx++)
     {
@@ -298,15 +299,15 @@ void draw_run(uint8_t (*const frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     }
     queue_idx_line_horiz = 0;
 
+    for (uint16_t square_idx = 0; square_idx < queue_idx_square; square_idx++)
+    {
+        draw_square(queue_square[square_idx].center, queue_square[square_idx].size, queue_square[square_idx].color);
+    }
+    queue_idx_square = 0;
+
     for (uint16_t number_idx = 0; number_idx < queue_idx_number; number_idx++)
     {
         draw_number(queue_number[number_idx].number, queue_number[number_idx].start, queue_number[number_idx].scale);
     }
     queue_idx_number = 0;
-
-    for (uint16_t pixel_idx = 0; pixel_idx < queue_idx_pixel; pixel_idx++)
-    {
-        draw_pixel(queue_pixel[pixel_idx].pos, queue_pixel[pixel_idx].color);
-    }
-    queue_idx_pixel = 0;
 }
