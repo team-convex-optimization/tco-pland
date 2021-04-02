@@ -114,8 +114,7 @@ static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
 {
     if ((*pixels)[point.y][point.x] != 255)
     {
-        log_debug("Tracing: %u %u", point.x, point.y);
-        draw_q_pixel(point, 150);
+        draw_q_pixel(point, 120);
         ray_length_last += 1;
         ray_hit.x = point.x;
         ray_hit.y = point.y;
@@ -133,7 +132,6 @@ static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
  */
 static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, vec2_t const dir)
 {
-    // draw_q_square(start, 10, 120);
     /* How much to stretch the direction vector so it touches the frame border. */
     float const edge_stretch_x = dir.x < 0 ? start.x / fabs((float)dir.x) : (TCO_FRAME_WIDTH - 1 - start.x) / fabs((float)dir.x);
     float const edge_stretch_y = dir.y < 0 ? start.y / fabs((float)dir.y) : (TCO_FRAME_HEIGHT - 1 - start.y) / fabs((float)dir.y);
@@ -143,11 +141,9 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
     angle. */
     vec2_t const dir_stretched = {dir.x * edge_stretch, dir.y * edge_stretch};
     point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
-    log_debug("end: %u %u", end.x, end.y);
-    draw_q_square(end, 10, 120);
 
-    bresenham(pixels, &raycast_callback, start, end);
-    // draw_q_square(ray_hit, 10, 120);
+    bresenham(pixels, &raycast_callback, (point2_t){start.x, start.y - 6}, end);
+    draw_q_square(ray_hit, 10, 120);
 
     return ray_length_last;
 }
@@ -160,49 +156,49 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
  * @param cw_or_ccw Begin tracing clockwise or counter-clockwise.
  * @return Last point traced.
  */
-// static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t hops_n, uint8_t cw_or_ccw)
-// {
-//     /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
-//     vec2_t const circ[] = {
-//         {0, -6},
-//         {-1, -6},
-//         {-2, -6},
-//         {-3, -5},
-//         {-4, -5},
-//         {-5, -4},
-//         {-5, -3},
-//         {-6, -2},
-//         {-6, -1},
-//         {-6, 0},
-//         {-6, 1},
-//         {-6, 2},
-//         {-5, 3},
-//         {-5, 4},
-//         {-4, 5},
-//         {-3, 5},
-//         {-2, 6},
-//         {-1, 6},
-//         {0, 6},
-//         {1, 6},
-//         {2, 6},
-//         {3, 5},
-//         {4, 5},
-//         {5, 4},
-//         {5, 3},
-//         {6, 2},
-//         {6, 1},
-//         {6, 0},
-//         {6, -1},
-//         {6, -2},
-//         {5, -3},
-//         {5, -4},
-//         {4, -5},
-//         {3, -5},
-//         {2, -6},
-//         {1, -6},
-//     };
-//     return (point2_t){0, 0};
-// }
+static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t hops_n, uint8_t cw_or_ccw)
+{
+    /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
+    vec2_t const circ[] = {
+        {0, -6},
+        {-1, -6},
+        {-2, -6},
+        {-3, -5},
+        {-4, -5},
+        {-5, -4},
+        {-5, -3},
+        {-6, -2},
+        {-6, -1},
+        {-6, 0},
+        {-6, 1},
+        {-6, 2},
+        {-5, 3},
+        {-5, 4},
+        {-4, 5},
+        {-3, 5},
+        {-2, 6},
+        {-1, 6},
+        {0, 6},
+        {1, 6},
+        {2, 6},
+        {3, 5},
+        {4, 5},
+        {5, 4},
+        {5, 3},
+        {6, 2},
+        {6, 1},
+        {6, 0},
+        {6, -1},
+        {6, -2},
+        {5, -3},
+        {5, -4},
+        {4, -5},
+        {3, -5},
+        {2, -6},
+        {1, -6},
+    };
+    return (point2_t){0, 0};
+}
 
 /**
  * @brief Returns a vector in the forward direction of the track.
@@ -210,31 +206,31 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
  * @param center Center point of the track.
  * @return A vector in the forward direction of the track. No guarantees on magnitude.
  */
-// static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
-// {
-//     point2_t edge_left = {center.x, center.y};
-//     point2_t edge_right = {center.x, center.y};
-//     while (edge_left.x > 0)
-//     {
-//         if ((*pixels)[edge_left.y][edge_left.x] == 255)
-//         {
-//             break;
-//         }
-//         edge_left.x -= 1;
-//     }
-//     while (edge_right.x < TCO_FRAME_WIDTH)
-//     {
-//         if ((*pixels)[edge_right.y][edge_right.x] == 255)
-//         {
-//             break;
-//         }
-//         edge_right.x += 1;
-//     }
+static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
+{
+    point2_t edge_left = {center.x, center.y};
+    point2_t edge_right = {center.x, center.y};
+    while (edge_left.x > 0)
+    {
+        if ((*pixels)[edge_left.y][edge_left.x] == 255)
+        {
+            break;
+        }
+        edge_left.x -= 1;
+    }
+    while (edge_right.x < TCO_FRAME_WIDTH)
+    {
+        if ((*pixels)[edge_right.y][edge_right.x] == 255)
+        {
+            break;
+        }
+        edge_right.x += 1;
+    }
 
-//     draw_q_square(edge_left, 20, 150);
-//     draw_q_square(edge_right, 20, 150);
-//     return (vec2_t){center.x, center.y};
-// }
+    draw_q_square(edge_left, 20, 150);
+    draw_q_square(edge_right, 20, 150);
+    return (vec2_t){center.x, center.y};
+}
 
 /**
  * @brief Track distances from the car to the edges of the track.
@@ -245,14 +241,14 @@ static void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_
 {
     // vec2_t dir_track = track_orientation(pixels, center);
     raycast(pixels, center, (vec2_t){0, -3});
-    // raycast(pixels, center, (vec2_t){1, -3});
-    // raycast(pixels, center, (vec2_t){-1, -3});
-    // raycast(pixels, center, (vec2_t){2, -3});
-    // raycast(pixels, center, (vec2_t){-2, -3});
-    // raycast(pixels, center, (vec2_t){3, -3});
-    // raycast(pixels, center, (vec2_t){-3, -3});
-    // raycast(pixels, center, (vec2_t){4, -3});
-    // raycast(pixels, center, (vec2_t){-4, -3});
+    raycast(pixels, center, (vec2_t){1, -3});
+    raycast(pixels, center, (vec2_t){-1, -3});
+    raycast(pixels, center, (vec2_t){2, -3});
+    raycast(pixels, center, (vec2_t){-2, -3});
+    raycast(pixels, center, (vec2_t){3, -3});
+    raycast(pixels, center, (vec2_t){-3, -3});
+    raycast(pixels, center, (vec2_t){4, -3});
+    raycast(pixels, center, (vec2_t){-4, -3});
 }
 
 int plnr_init()
