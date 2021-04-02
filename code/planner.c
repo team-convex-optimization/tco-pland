@@ -34,6 +34,22 @@ static buf_circ_t track_distances = {track_distances_data, track_distances_count
 static uint16_t ray_length_last = 0;
 static point2_t ray_hit = {0, 0};
 
+/* Rotation matrix: [[cos(20 deg) -sin(20 deg)], [sin(20 deg) cos(20 deg)]] */
+static float const rot_cw20_mat_data[4] = {0.939692620786f, -0.342020143326f, 0.342020143326f, 0.939692620786f};
+static matf_t const rot_cw20_matrix = {(float *)rot_cw20_mat_data, 2, 2};
+
+/* Rotation matrix: [[cos(-20 deg) -sin(-20 deg)], [sin(-20 deg) cos(-20 deg)]] */
+static float const rot_ccw20_mat_data[4] = {0.939692620786f, 0.342020143326f, -0.342020143326f, 0.939692620786f};
+static matf_t const rot_ccw20_matrix = {(float *)rot_ccw20_mat_data, 2, 2};
+
+/* Rotation matrix: [[cos(10 deg) -sin(10 deg)], [sin(10 deg) cos(10 deg)]] */
+static float const rot_cw10_mat_data[4] = {0.984807753012f, -0.173648177667f, 0.173648177667f, 0.984807753012f};
+static matf_t const rot_cw10_matrix = {(float *)rot_cw10_mat_data, 2, 2};
+
+/* Rotation matrix: [[cos(-10 deg) -sin(-10 deg)], [sin(-10 deg) cos(-10 deg)]] */
+static float const rot_ccw10_mat_data[4] = {0.984807753012f, 0.173648177667f, -0.173648177667f, 0.984807753012f};
+static matf_t const rot_ccw10_matrix = {(float *)rot_ccw10_mat_data, 2, 2};
+
 /**
  * @brief Given a list of uint16_t values, finds the median and returns it.
  * @param list List of values to find median inside.
@@ -238,7 +254,7 @@ static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
             {
                 return trace_last;
             }
-            draw_q_pixel(trace_target, 120);
+            // draw_q_pixel(trace_target, 120);
 
             /* End current sweep when a white point is found and move onto the next one. */
             if ((*pixels)[trace_target.y][trace_target.x] == 255)
@@ -304,9 +320,6 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
         edge_right.x += 1;
     }
 
-    draw_q_square(edge_left, 4, 120);
-    draw_q_square(edge_right, 4, 120);
-
     point2_t edge_left_trace = edge_left;
     point2_t edge_right_trace = edge_right;
 
@@ -366,29 +379,49 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
  */
 static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
-    point2_t const center_black = {center.x, center.y - 10};
+    point2_t const center_black = {center.x, center.y - 8};
     vec2_t const dir_track = track_orientation(pixels, center_black);
+    float const dir_track_inv_length = 1 / sqrt(dir_track.x * dir_track.x + dir_track.y * dir_track.y);
 
-    /* Normalize the track direction such that it is approximately the length of the other direction vectors. */
-    float const dir_track_inv_dir_length = sqrt(2 * 2 + -3 * -3) / sqrt(dir_track.x * dir_track.x + dir_track.y * dir_track.y);
-    vec2_t const dir_track_short = {dir_track.x * (dir_track_inv_dir_length), dir_track.y * dir_track_inv_dir_length};
+    /* Normalize track direction to a known length. */
+    float const track_dir_short_data[2] = {dir_track.x * dir_track_inv_length * 40.0f, dir_track.y * dir_track_inv_length * 40.0f};
+    matf_t const track_dir_short_mat = {(float *)track_dir_short_data, 2, 1};
 
-    raycast(pixels, center_black, dir_track);
-    vec2_t const dirs[] = {
-        {-2, -3},
-        {-1, -3},
-        {0, -3},
-        {1, -3},
-        {2, -3},
-    };
-    uint16_t dirs_num = sizeof(dirs) / sizeof(vec2_t);
+    float vec_rot_cw20_data[2];
+    float vec_rot_ccw20_data[2];
+    float vec_rot_cw10_data[2];
+    float vec_rot_ccw10_data[2];
+    matf_t vec_rot_cw20 = {(float *)vec_rot_cw20_data, 2, 1};
+    matf_t vec_rot_ccw20 = {(float *)vec_rot_ccw20_data, 2, 1};
+    matf_t vec_rot_cw10 = {(float *)vec_rot_cw10_data, 2, 1};
+    matf_t vec_rot_ccw10 = {(float *)vec_rot_ccw10_data, 2, 1};
+
+    /* Create two vectors, one rotated clockwise and other counter-clockwise relative to track
+    direction. */
+    matf_mul_matf(&rot_cw20_matrix, &track_dir_short_mat, &vec_rot_cw20);
+    matf_mul_matf(&rot_ccw20_matrix, &track_dir_short_mat, &vec_rot_ccw20);
+    matf_mul_matf(&rot_cw10_matrix, &track_dir_short_mat, &vec_rot_cw10);
+    matf_mul_matf(&rot_ccw10_matrix, &track_dir_short_mat, &vec_rot_ccw10);
+
+    vec2_t const dir0 = {track_dir_short_data[0], track_dir_short_data[1]};
+    vec2_t const dir1 = {vec_rot_cw20_data[0], vec_rot_cw20_data[1]};
+    vec2_t const dir2 = {vec_rot_ccw20_data[0], vec_rot_ccw20_data[1]};
+    vec2_t const dir3 = {vec_rot_cw10_data[0], vec_rot_cw10_data[1]};
+    vec2_t const dir4 = {vec_rot_ccw10_data[0], vec_rot_ccw10_data[1]};
+
+    draw_q_square((point2_t){dir0.x + center_black.x, dir0.y + center_black.y}, 10, 100);
+    draw_q_square((point2_t){dir1.x + center_black.x, dir1.y + center_black.y}, 10, 150);
+    draw_q_square((point2_t){dir2.x + center_black.x, dir2.y + center_black.y}, 10, 150);
+    draw_q_square((point2_t){dir3.x + center_black.x, dir3.y + center_black.y}, 10, 150);
+    draw_q_square((point2_t){dir4.x + center_black.x, dir4.y + center_black.y}, 10, 150);
 
     uint16_t distance_total = 0;
-    for (uint16_t dir_idx = 0; dir_idx < dirs_num; dir_idx++)
-    {
-        distance_total += raycast(pixels, center_black, (vec2_t){dirs[dir_idx].x + dir_track_short.x, dirs[dir_idx].y});
-    }
-    distance_total /= dirs_num;
+    distance_total += raycast(pixels, center_black, dir0);
+    distance_total += raycast(pixels, center_black, dir1);
+    distance_total += raycast(pixels, center_black, dir2);
+    distance_total += raycast(pixels, center_black, dir3);
+    distance_total += raycast(pixels, center_black, dir4);
+    distance_total /= 5;
     buf_circ_add(&track_distances, (uint8_t *)&distance_total);
     return listu16_median(track_distances_data, track_distances_count);
 }
