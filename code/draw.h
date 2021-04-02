@@ -8,15 +8,10 @@
 extern const int draw_enabled;
 
 /**
- * @brief Initializes the draw module.
- * @param frame The frame where all shapes will be drawn.
+ * @brief Draws all queued shapes on a given frame.
+ * @param frame Where all queued shapes will be drawn.
  */
-void draw_init(uint8_t (*const frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]);
-
-/**
- * @brief Draws all queued shapes.
- */
-void draw_run();
+void draw_run(uint8_t (*const frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]);
 
 /**
  * @brief Queues a line to be drawn at a given y index.
@@ -40,5 +35,12 @@ void draw_q_square(point2_t const center, uint8_t const size, uint8_t const colo
  * @param scale Every pixel of the number will be scaled by this amount in both directions uniformly.
  */
 void draw_q_number(uint16_t const number, point2_t const start, uint8_t const scale);
+
+/**
+ * @brief Queues a pixel to be drawn at a given position.
+ * @param pos Position of the pixel.
+ * @param color Color of the pixel.
+ */
+void draw_q_pixel(point2_t const pos, uint8_t const color);
 
 #endif /* _DRAW_H_ */

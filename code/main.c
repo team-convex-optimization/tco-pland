@@ -20,13 +20,14 @@ void user_proc_func(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int le
   {
     for (size_t x = 0; x < TCO_FRAME_WIDTH; x++)
     {
-      /* 50~the floor shade of gray so that segment doesn't see the jump from floor to black as a
+      /* 80~the floor shade of gray so that segment doesn't see the jump from floor to black as a
       track edge. */
-      (*pixels)[y][x] = 50;
+      (*pixels)[y][x] = 80;
     }
   }
   segment(pixels);
-  // plnr_step(pixels);
+  plnr_step(pixels);
+  draw_run(pixels);
 }
 
 int user_deinit()

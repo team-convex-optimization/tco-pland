@@ -17,6 +17,7 @@ clang \
     -Wall \
     -std=c11 \
     -D _DEFAULT_SOURCE \
+    -D TRAINING \
     -I ../code \
     -I ../code/utils \
     -I ../lib/tco_libd/include \
@@ -31,7 +32,6 @@ clang \
     -l glib-2.0 \
 	-l gobject-2.0 \
     -l pthread \
-    -D TRAINING \
     `pkg-config --cflags --libs gstreamer-1.0` \
     ../code/*.c \
     ../code/utils/*.c \

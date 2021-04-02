@@ -24,18 +24,27 @@ typedef struct number
     uint16_t number;
     uint8_t scale;
 } number_t;
+typedef struct pixel
+{
+    point2_t pos;
+    uint8_t color;
+} pixel_t;
 
 static const uint16_t queue_size_line_horiz = 256;
 static line_horiz_t queue_line_horiz[queue_size_line_horiz] = {0};
-static uint8_t queue_idx_line_horiz = 0;
+static uint16_t queue_idx_line_horiz = 0;
 
 static const uint16_t queue_size_square = 256;
 static square_t queue_square[queue_size_square] = {0};
-static uint8_t queue_idx_square = 0;
+static uint16_t queue_idx_square = 0;
 
 static const uint16_t queue_size_number = 256;
 static number_t queue_number[queue_size_number] = {0};
-static uint8_t queue_idx_number = 0;
+static uint16_t queue_idx_number = 0;
+
+static const uint16_t queue_size_pixel = 2096;
+static pixel_t queue_pixel[queue_size_pixel] = {0};
+static uint16_t queue_idx_pixel = 0;
 
 static void draw_line_horiz(uint16_t const row_idx, uint8_t const color)
 {
@@ -48,10 +57,10 @@ static void draw_square(point2_t const point, uint8_t const size, uint8_t const 
     uint8_t square_row[size];
     memset(square_row, color, size);
 
-    for (uint16_t y = 0; y < size; y++)
+    for (uint16_t scanline_n = 0; scanline_n < size; scanline_n++)
     {
-        int32_t const draw_y = point.y - radius;
-        if (draw_y + y < 0 || draw_y + y >= TCO_FRAME_HEIGHT)
+        int32_t const draw_y = point.y - radius + scanline_n;
+        if (draw_y < 0 || draw_y >= TCO_FRAME_HEIGHT)
         {
             /* When outside the frame. */
             continue;
@@ -59,7 +68,7 @@ static void draw_square(point2_t const point, uint8_t const size, uint8_t const 
 
         int32_t const draw_x_left_offset = point.x - radius < 0 ? -(point.x - radius) : 0;
         int32_t const draw_x_right_offset = point.x + radius >= TCO_FRAME_WIDTH ? (point.x + radius) - TCO_FRAME_WIDTH : 0;
-        int32_t const draw_x = point.x + draw_x_left_offset - draw_x_right_offset - radius;
+        int32_t const draw_x = point.x - radius + draw_x_left_offset; /* TODO: Verify if this is correct. */
         if (draw_x < 0)
         {
             /* When frame is too small for square. */
@@ -72,7 +81,7 @@ static void draw_square(point2_t const point, uint8_t const size, uint8_t const 
             continue;
         }
 
-        memcpy(&(*target_frame)[draw_y + y][draw_x], square_row, draw_width);
+        memcpy(&(*target_frame)[draw_y][draw_x], square_row, draw_width);
     }
 }
 
@@ -196,18 +205,23 @@ static void draw_number(uint16_t const number, point2_t const start, uint8_t con
     }
 }
 
+static void draw_pixel(point2_t const pos, uint8_t const color)
+{
+    (*target_frame)[pos.y][pos.x] = color;
+}
+
 void draw_q_line_horiz(uint16_t const row_idx, uint8_t const color)
 {
     if (!draw_enabled)
     {
         return;
     }
-    if (queue_idx_line_horiz + 1 >= queue_size_line_horiz)
+    if (queue_idx_line_horiz >= queue_size_line_horiz)
     {
         log_error("Tried queueing a horizontal line with no space in the queue.");
         return;
     }
-    line_horiz_t *const el = &queue_line_horiz[++queue_idx_line_horiz];
+    line_horiz_t *const el = &queue_line_horiz[queue_idx_line_horiz++];
     el->y = row_idx;
     el->color = color;
 }
@@ -218,12 +232,12 @@ void draw_q_square(point2_t const center, uint8_t const size, uint8_t const colo
     {
         return;
     }
-    if (queue_idx_square + 1 >= queue_size_square)
+    if (queue_idx_square >= queue_size_square)
     {
         log_error("Tried queueing a square with no space in the queue.");
         return;
     }
-    square_t *const el = &queue_square[++queue_idx_square];
+    square_t *const el = &queue_square[queue_idx_square++];
     el->center.x = center.x;
     el->center.y = center.y;
     el->size = size;
@@ -236,46 +250,63 @@ void draw_q_number(uint16_t const number, point2_t const start, uint8_t const sc
     {
         return;
     }
-    if (queue_idx_number + 1 >= queue_size_number)
+    if (queue_idx_number >= queue_size_number)
     {
         log_error("Tried queueing a horizontal line with no space in the queue.");
         return;
     }
-    number_t *const el = &queue_number[++queue_idx_number];
+    number_t *const el = &queue_number[queue_idx_number++];
     el->start.x = start.x;
     el->start.y = start.y;
     el->number = number;
     el->scale = scale;
 }
 
-void draw_init(uint8_t (*const frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
+void draw_q_pixel(point2_t const pos, uint8_t const color)
 {
     if (!draw_enabled)
     {
         return;
     }
-    target_frame = frame;
+    if (queue_idx_pixel >= queue_size_pixel)
+    {
+        log_error("Tried queueing a pixel with no space in the queue.");
+        return;
+    }
+    pixel_t *const el = &queue_pixel[queue_idx_pixel++];
+    el->pos.x = pos.x;
+    el->pos.y = pos.y;
+    el->color = color;
 }
 
-void draw_run()
+void draw_run(uint8_t (*const frame)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
+    target_frame = frame;
     if (!draw_enabled)
     {
         return;
     }
-    for (uint16_t square_idx = 0; square_idx <= queue_idx_square; square_idx++)
+    for (uint16_t square_idx = 0; square_idx < queue_idx_square; square_idx++)
     {
         draw_square(queue_square[square_idx].center, queue_square[square_idx].size, queue_square[square_idx].color);
     }
     queue_idx_square = 0;
-    for (uint16_t line_horiz_idx = 0; line_horiz_idx <= queue_idx_line_horiz; line_horiz_idx++)
+
+    for (uint16_t line_horiz_idx = 0; line_horiz_idx < queue_idx_line_horiz; line_horiz_idx++)
     {
         draw_line_horiz(queue_line_horiz[line_horiz_idx].y, queue_line_horiz[line_horiz_idx].color);
     }
     queue_idx_line_horiz = 0;
-    for (uint16_t number_idx = 0; number_idx <= queue_idx_number; number_idx++)
+
+    for (uint16_t number_idx = 0; number_idx < queue_idx_number; number_idx++)
     {
         draw_number(queue_number[number_idx].number, queue_number[number_idx].start, queue_number[number_idx].scale);
     }
     queue_idx_number = 0;
+
+    for (uint16_t pixel_idx = 0; pixel_idx < queue_idx_pixel; pixel_idx++)
+    {
+        draw_pixel(queue_pixel[pixel_idx].pos, queue_pixel[pixel_idx].color);
+    }
+    queue_idx_pixel = 0;
 }

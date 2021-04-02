@@ -112,14 +112,13 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
     uint8_t _Alignas(4) frame_processed_tmp[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
+    draw_q_number(fps_now, (point2_t){10, 10}, 4);
+
     /* Process image here by modifying 'frame_processed_tmp'. */
-    draw_init(&frame_processed_tmp);
     cam_mgr_user_data_t *compute_user_data = args_ptr;
     compute_user_data->f(&frame_processed_tmp, frame_size_expected, compute_user_data->args);
 
     /* Measure FPS. */
-    draw_q_number(fps_now, (point2_t){10, 10}, 4);
-    draw_run(); /* XXX: Is there a better place to put this. */
     if (fps_counter == 0)
     {
         clock_gettime(CLOCK_REALTIME, &compute_user_data->frame_end_times[0]);

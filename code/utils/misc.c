@@ -23,7 +23,7 @@ void bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
     {
         if (pixel_action(pixels, (point2_t){x, y}) != 0)
         {
-            return;
+            break;
         }
         if (x == end.x && y == end.y)
         {
