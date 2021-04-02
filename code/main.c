@@ -22,7 +22,7 @@ void user_proc_func(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int le
     {
       /* 80~the floor shade of gray so that segment doesn't see the jump from floor to black as a
       track edge. */
-      (*pixels)[y][x] = 80;
+      (*pixels)[y][x] = 40;
     }
   }
   segment(pixels);
