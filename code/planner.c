@@ -134,7 +134,10 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
     bresenham(pixels, &raycast_callback, (point2_t){start.x, start.y}, end);
     draw_q_square(ray_hit, 10, 120);
 
-    return ray_length_last;
+    uint16_t ray_length_tmp = ray_length_last;
+    ray_length_last = 0;
+
+    return ray_length_tmp;
 }
 
 /**
