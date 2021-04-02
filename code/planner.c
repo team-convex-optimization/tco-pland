@@ -141,53 +141,123 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
  * @brief Perform a fast but rough radial sweep contour trace. It will trace at most @p
  * contour_length pixels and will travel in @p cw_or_ccw (clockwise or counter-clockwise) direction.
  * @param pixels The frame.
+ * @param start Where the the tracing should start from.
  * @param contour_length Max number of traced pixels.
  * @param cw_or_ccw Begin tracing clockwise or counter-clockwise.
  * @return Last point traced.
  */
-static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t contour_length, uint8_t cw_or_ccw)
+static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, uint16_t const contour_length, uint8_t const cw_or_ccw)
 {
+    static uint16_t const trace_margin = 10;
     /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
     /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
-    vec2_t const circ[] = {
+    static vec2_t const circ_data[] = {
         {0, -6},
-        {-1, -6},
-        {-2, -6},
-        {-3, -5},
-        {-4, -5},
-        {-5, -4},
-        {-5, -3},
-        {-6, -2},
-        {-6, -1},
-        {-6, 0},
-        {-6, 1},
-        {-6, 2},
-        {-5, 3},
-        {-5, 4},
-        {-4, 5},
-        {-3, 5},
-        {-2, 6},
-        {-1, 6},
-        {0, 6},
-        {1, 6},
-        {2, 6},
-        {3, 5},
-        {4, 5},
-        {5, 4},
-        {5, 3},
-        {6, 2},
-        {6, 1},
-        {6, 0},
-        {6, -1},
-        {6, -2},
-        {5, -3},
-        {5, -4},
-        {4, -5},
-        {3, -5},
-        {2, -6},
         {1, -6},
+        {2, -6},
+        {3, -5},
+        {4, -5},
+        {5, -4},
+        {5, -3},
+        {6, -2},
+        {6, -1},
+        {6, 0},
+        {6, 1},
+        {6, 2},
+        {5, 3},
+        {5, 4},
+        {4, 5},
+        {3, 5},
+        {2, 6},
+        {1, 6},
+        {0, 6},
+        {-1, 6},
+        {-2, 6},
+        {-3, 5},
+        {-4, 5},
+        {-5, 4},
+        {-5, 3},
+        {-6, 2},
+        {-6, 1},
+        {-6, 0},
+        {-6, -1},
+        {-6, -2},
+        {-5, -3},
+        {-5, -4},
+        {-4, -5},
+        {-3, -5},
+        {-2, -6},
+        {-1, -6},
     };
-    uint16_t quadrant_size = (sizeof(circ) - 4) / 4;
+    uint16_t const circ_size = sizeof(circ_data) / sizeof(vec2_t);
+    buf_circ_t circ_buf = {(void *)circ_data, circ_size, circ_size - 1, sizeof(vec2_t)};
+    uint16_t const quarter_size = circ_size / 4;
+
+    uint16_t contour_length_current = 0;
+    uint16_t circ_idx = 0;
+    uint16_t const circ_idx_90deg = quarter_size + quarter_size + quarter_size;
+    uint16_t const circ_idx_270deg = quarter_size;
+    if (cw_or_ccw)
+    {
+        circ_idx = circ_idx_90deg;
+    }
+    else
+    {
+        circ_idx = circ_idx_270deg;
+    }
+    point2_t trace_last = start;
+
+    for (uint16_t contour_length_now = 0; contour_length_now < contour_length; contour_length_now++)
+    {
+        for (uint16_t swept_pts = 0; swept_pts < circ_size - 1; swept_pts++)
+        {
+            vec2_t const circ_vec = *((vec2_t *)buf_circ_get(&circ_buf, circ_idx));
+            point2_t const trace_target = {trace_last.x + circ_vec.x, trace_last.y + circ_vec.y};
+
+            /* Outside bounds */
+            if (trace_target.y >= TCO_FRAME_HEIGHT - trace_margin ||
+                trace_last.x >= TCO_FRAME_WIDTH - trace_margin ||
+                trace_last.x <= trace_margin ||
+                trace_target.y <= trace_margin)
+            {
+                return trace_last;
+            }
+            draw_q_pixel(trace_target, 120);
+
+            /* End current sweep when a white point is found and move onto the next one. */
+            if ((*pixels)[trace_target.y][trace_target.x] == 255)
+            {
+                trace_last = trace_target;
+                /* Sweep from a normal to the current point. */
+                if (cw_or_ccw)
+                {
+                    circ_idx = circ_idx + circ_idx_90deg;
+                }
+                else
+                {
+                    circ_idx = circ_idx + circ_idx_270deg;
+                }
+                break;
+            }
+
+            /* Go to next circle point. */
+            if (cw_or_ccw)
+            {
+                circ_idx += 1;
+            }
+            else
+            {
+                circ_idx += circ_size - 1; /* "buf_circ_get" will wrap-around automatically. */
+            }
+
+            /* If swept through whole circle (excluding starting pos) without a trace, just end prematurely.  */
+            if (swept_pts >= circ_size - 1)
+            {
+                return trace_last;
+            }
+        }
+    }
+    return trace_last;
 }
 
 /**
@@ -217,8 +287,17 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
         edge_right.x += 1;
     }
 
-    draw_q_square(edge_left, 4, 150);
-    draw_q_square(edge_right, 4, 150);
+    draw_q_square(edge_left, 4, 120);
+    draw_q_square(edge_right, 4, 120);
+
+    if ((*pixels)[edge_left.y][edge_left.x] == 255)
+    {
+        radial_sweep(pixels, edge_left, 40, 0);
+    }
+    if ((*pixels)[edge_right.y][edge_right.x] == 255)
+    {
+        radial_sweep(pixels, edge_right, 40, 1);
+    }
     return (vec2_t){center.x, center.y};
 }
 
@@ -229,8 +308,8 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
  */
 static void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
-    point2_t const center_black = {center.x, center.y - 6};
-    // vec2_t dir_track = track_orientation(pixels, center_black);
+    point2_t const center_black = {center.x, center.y - 10};
+    vec2_t dir_track = track_orientation(pixels, center_black);
     raycast(pixels, center_black, (vec2_t){0, -3});
     raycast(pixels, center_black, (vec2_t){1, -3});
     raycast(pixels, center_black, (vec2_t){-1, -3});
