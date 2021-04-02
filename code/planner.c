@@ -31,9 +31,11 @@ static uint8_t const track_distances_count = 6;
 static uint16_t track_distances_data[track_distances_count] = {0};
 static buf_circ_t track_distances = {track_distances_data, track_distances_count, track_distances_count - 1, sizeof(uint16_t)};
 
+/* Used in raycasting to communicate between callback and the cast initiating function. */
 static uint16_t ray_length_last = 0;
 static point2_t ray_hit = {0, 0};
 
+/* All these matrices have been generated using the 'tco_matrix_gen' utility. */
 /* Rotation matrix: [[cos(20 deg) -sin(20 deg)], [sin(20 deg) cos(20 deg)]] */
 static float const rot_cw20_mat_data[4] = {0.939692620786f, -0.342020143326f, 0.342020143326f, 0.939692620786f};
 static matf_t const rot_cw20_matrix = {(float *)rot_cw20_mat_data, 2, 2};
