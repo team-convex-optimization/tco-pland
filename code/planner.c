@@ -14,6 +14,7 @@
 #include "draw.h"
 #include "sort.h"
 #include "misc.h"
+#include "buf_circ.h"
 
 static struct tco_shmem_data_training *shmem_training;
 static sem_t *shmem_sem_training;
@@ -23,23 +24,11 @@ static uint8_t shmem_training_open = 0;
 static uint8_t shmem_plan_open = 0;
 
 static uint8_t const track_center_count = 4;
-static uint16_t track_centers[track_center_count] = {0};
-static uint8_t track_centers_push_idx = 0;
+static uint16_t track_centers_data[track_center_count] = {0};
+static buf_circ_t track_centers = {track_centers_data, track_center_count, track_center_count - 1, sizeof(uint16_t)};
 
 static uint16_t ray_length_last = 0;
 static point2_t ray_hit = {0, 0};
-
-/**
- * @brief Push a new track center to the track center list. This handles wrapping around.
- * @note The list works like a circular buffer.
- * @param track_center_new The track center to push.
- */
-static void track_center_push(uint16_t const track_center_new)
-{
-    track_centers[(track_centers_push_idx + 1) % track_center_count] = track_center_new;
-    track_centers_push_idx += 1;
-    track_centers_push_idx %= track_center_count;
-}
 
 /**
  * @brief Uses all points in the track center list to find the best current center point.
@@ -47,7 +36,7 @@ static void track_center_push(uint16_t const track_center_new)
 static uint16_t track_center_compute()
 {
     uint16_t track_centers_cpy[track_center_count];
-    memcpy(track_centers_cpy, track_centers, track_center_count * sizeof(uint16_t));
+    memcpy(track_centers_cpy, track_centers.data, track_center_count * sizeof(uint16_t));
     insertion_sort_integer((uint8_t *)track_centers_cpy, track_center_count, 2, &comp_u16);
 
     uint16_t median;
@@ -99,7 +88,7 @@ static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
         region_largest_size = region_size;
     }
     uint16_t track_center_new = region_largest_start + (region_largest_size / 2);
-    track_center_push(track_center_new);
+    buf_circ_add(&track_centers, &track_center_new);
     point2_t const center = {track_center_compute(), bottom_row_idx};
     return center;
 }
@@ -142,23 +131,24 @@ static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
     vec2_t const dir_stretched = {dir.x * edge_stretch, dir.y * edge_stretch};
     point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
 
-    bresenham(pixels, &raycast_callback, (point2_t){start.x, start.y - 6}, end);
+    bresenham(pixels, &raycast_callback, (point2_t){start.x, start.y}, end);
     draw_q_square(ray_hit, 10, 120);
 
     return ray_length_last;
 }
 
 /**
- * @brief Perform radial sweep contour tracing. It will trace at most @p hops_n pixels and will
- * travel in @p cw_or_ccw (clockwise or counter-clockwise) direction. 
+ * @brief Perform a fast but rough radial sweep contour trace. It will trace at most @p
+ * contour_length pixels and will travel in @p cw_or_ccw (clockwise or counter-clockwise) direction.
  * @param pixels The frame.
- * @param hops_n Max number of traced pixels.
+ * @param contour_length Max number of traced pixels.
  * @param cw_or_ccw Begin tracing clockwise or counter-clockwise.
  * @return Last point traced.
  */
-static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t hops_n, uint8_t cw_or_ccw)
+static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t contour_length, uint8_t cw_or_ccw)
 {
     /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
+    /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
     vec2_t const circ[] = {
         {0, -6},
         {-1, -6},
@@ -197,7 +187,7 @@ static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
         {2, -6},
         {1, -6},
     };
-    return (point2_t){0, 0};
+    uint16_t quadrant_size = (sizeof(circ) - 4) / 4;
 }
 
 /**
@@ -227,8 +217,8 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
         edge_right.x += 1;
     }
 
-    draw_q_square(edge_left, 20, 150);
-    draw_q_square(edge_right, 20, 150);
+    draw_q_square(edge_left, 4, 150);
+    draw_q_square(edge_right, 4, 150);
     return (vec2_t){center.x, center.y};
 }
 
@@ -239,16 +229,17 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
  */
 static void track_distances(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
 {
-    vec2_t dir_track = track_orientation(pixels, center);
-    raycast(pixels, center, (vec2_t){0, -3});
-    raycast(pixels, center, (vec2_t){1, -3});
-    raycast(pixels, center, (vec2_t){-1, -3});
-    raycast(pixels, center, (vec2_t){2, -3});
-    raycast(pixels, center, (vec2_t){-2, -3});
-    raycast(pixels, center, (vec2_t){3, -3});
-    raycast(pixels, center, (vec2_t){-3, -3});
-    raycast(pixels, center, (vec2_t){4, -3});
-    raycast(pixels, center, (vec2_t){-4, -3});
+    point2_t const center_black = {center.x, center.y - 6};
+    // vec2_t dir_track = track_orientation(pixels, center_black);
+    raycast(pixels, center_black, (vec2_t){0, -3});
+    raycast(pixels, center_black, (vec2_t){1, -3});
+    raycast(pixels, center_black, (vec2_t){-1, -3});
+    raycast(pixels, center_black, (vec2_t){2, -3});
+    raycast(pixels, center_black, (vec2_t){-2, -3});
+    raycast(pixels, center_black, (vec2_t){3, -3});
+    raycast(pixels, center_black, (vec2_t){-3, -3});
+    raycast(pixels, center_black, (vec2_t){4, -3});
+    raycast(pixels, center_black, (vec2_t){-4, -3});
 }
 
 int plnr_init()
