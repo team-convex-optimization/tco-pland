@@ -142,182 +142,36 @@ static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
 }
 
 /**
- * @brief Start a raycast from a @p start position in the direction of @p dir .
- * @param pixels Frame where the raycast will be shot. It needs to be a segmented frame.
- * @param start Where the raycast will begin.
- * @param dir In what direction the ray will be cast.
- * @return Length of the raycast.
+ * @brief Find an edge of the track.
+ * @param pixels A segmented frame where to search.
+ * @param center_black Where to start searching. This must be the track center and must lie on top of a black pixel.
+ * @param left_or_right If 1 then left edge is returned, if 0 then right edge is returned.
+ * @return Edge of the track.
  */
-static uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, vec2_t const dir)
+static point2_t track_edge(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center, uint8_t const left_or_right)
 {
-    /* How much to stretch the direction vector so it touches the frame border. */
-    float const edge_stretch_x = dir.x < 0 ? start.x / fabs((float)dir.x) : (TCO_FRAME_WIDTH - 1 - start.x) / fabs((float)dir.x);
-    float const edge_stretch_y = dir.y < 0 ? start.y / fabs((float)dir.y) : (TCO_FRAME_HEIGHT - 1 - start.y) / fabs((float)dir.y);
-    float const edge_stretch = edge_stretch_y < edge_stretch_x ? edge_stretch_y : edge_stretch_x;
-
-    /* A direction vector which when added to start goes to the border of the frame while keeping
-    angle. */
-    vec2_t const dir_stretched = {dir.x * edge_stretch, dir.y * edge_stretch};
-    point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
-
-    bresenham(pixels, &raycast_callback, (point2_t){start.x, start.y}, end);
-    draw_q_square(ray_hit, 10, 120);
-
-    uint16_t ray_length_tmp = ray_length_last;
-    ray_length_last = 0;
-
-    return ray_length_tmp;
-}
-
-/**
- * @brief Perform a fast but rough radial sweep contour trace. It will trace at most @p
- * contour_length pixels and will travel in @p cw_or_ccw (clockwise or counter-clockwise) direction.
- * @param pixels The frame.
- * @param start Where the the tracing should start from.
- * @param contour_length Max number of traced pixels.
- * @param cw_or_ccw Begin tracing clockwise or counter-clockwise.
- * @return Last point traced.
- */
-static point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, uint16_t const contour_length, uint8_t const cw_or_ccw)
-{
-    static uint16_t const trace_margin = 10;
-    /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
-    /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
-    static vec2_t const circ_data[] = {
-        {0, -6},
-        {1, -6},
-        {2, -6},
-        {3, -5},
-        {4, -5},
-        {5, -4},
-        {5, -3},
-        {6, -2},
-        {6, -1},
-        {6, 0},
-        {6, 1},
-        {6, 2},
-        {5, 3},
-        {5, 4},
-        {4, 5},
-        {3, 5},
-        {2, 6},
-        {1, 6},
-        {0, 6},
-        {-1, 6},
-        {-2, 6},
-        {-3, 5},
-        {-4, 5},
-        {-5, 4},
-        {-5, 3},
-        {-6, 2},
-        {-6, 1},
-        {-6, 0},
-        {-6, -1},
-        {-6, -2},
-        {-5, -3},
-        {-5, -4},
-        {-4, -5},
-        {-3, -5},
-        {-2, -6},
-        {-1, -6},
-    };
-    uint16_t const circ_size = sizeof(circ_data) / sizeof(vec2_t);
-    uint16_t const quarter_size = circ_size / 4;
-    uint16_t const circ_idx_90deg = quarter_size + quarter_size + quarter_size;
-    uint16_t const circ_idx_270deg = quarter_size;
-
-    buf_circ_t circ_buf = {(void *)circ_data, circ_size, circ_size - 1, sizeof(vec2_t)};
-    uint16_t circ_idx = 0;
-    point2_t trace_last = start;
-    if (cw_or_ccw)
+    int8_t search_delta = left_or_right ? -1 : 1;
+    uint16_t edge_x = center.x;
+    while (edge_x > 0 && edge_x < TCO_FRAME_WIDTH)
     {
-        circ_idx = circ_idx_90deg;
-    }
-    else
-    {
-        circ_idx = circ_idx_270deg;
-    }
-    for (uint16_t contour_length_now = 0; contour_length_now < contour_length; contour_length_now++)
-    {
-        for (uint16_t swept_pts = 0; swept_pts < circ_size - 1; swept_pts++)
+        if ((*pixels)[center.y][edge_x] == 255)
         {
-            vec2_t const circ_vec = *((vec2_t *)buf_circ_get(&circ_buf, circ_idx));
-            point2_t const trace_target = {trace_last.x + circ_vec.x, trace_last.y + circ_vec.y};
-
-            /* Outside bounds */
-            if (trace_target.y >= TCO_FRAME_HEIGHT - trace_margin ||
-                trace_last.x >= TCO_FRAME_WIDTH - trace_margin ||
-                trace_last.x <= trace_margin ||
-                trace_target.y <= trace_margin)
-            {
-                return trace_last;
-            }
-            // draw_q_pixel(trace_target, 120);
-
-            /* End current sweep when a white point is found and move onto the next one. */
-            if ((*pixels)[trace_target.y][trace_target.x] == 255)
-            {
-                trace_last = trace_target;
-                /* Sweep from a normal to the current point. */
-                if (cw_or_ccw)
-                {
-                    circ_idx = circ_idx + circ_idx_90deg;
-                }
-                else
-                {
-                    circ_idx = circ_idx + circ_idx_270deg;
-                }
-                break;
-            }
-
-            /* Go to next circle point. */
-            if (cw_or_ccw)
-            {
-                circ_idx += 1;
-            }
-            else
-            {
-                circ_idx += circ_size - 1; /* "buf_circ_get" will wrap-around automatically. */
-            }
-
-            /* If swept through whole circle (excluding starting pos) without a trace, just end
-            prematurely.  */
-            if (swept_pts >= circ_size - 1)
-            {
-                return trace_last;
-            }
+            break;
         }
+        edge_x += search_delta;
     }
-    return trace_last;
+    return (point2_t){edge_x, center.y};
 }
 
 /**
  * @brief Returns a vector in the forward direction of the track.
  * @param pixels The frame.
- * @param center Center point of the track.
+ * @param edge_left Left edge of the track.
+ * @param edge_right Right edge of the track.
  * @return A vector in the forward direction of the track. No guarantees on magnitude.
  */
-static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
+static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const edge_left, point2_t const edge_right)
 {
-    point2_t edge_left = {center.x, center.y};
-    point2_t edge_right = {center.x, center.y};
-    while (edge_left.x > 0)
-    {
-        if ((*pixels)[edge_left.y][edge_left.x] == 255)
-        {
-            break;
-        }
-        edge_left.x -= 1;
-    }
-    while (edge_right.x < TCO_FRAME_WIDTH)
-    {
-        if ((*pixels)[edge_right.y][edge_right.x] == 255)
-        {
-            break;
-        }
-        edge_right.x += 1;
-    }
-
     point2_t edge_left_trace = edge_left;
     point2_t edge_right_trace = edge_right;
 
@@ -326,12 +180,12 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
 
     if ((*pixels)[edge_left.y][edge_left.x] == 255)
     {
-        edge_left_trace = radial_sweep(pixels, edge_left, 10, 0);
+        edge_left_trace = radial_sweep(pixels, edge_left, 30, 0);
         edge_left_missing = 0;
     }
     if ((*pixels)[edge_right.y][edge_right.x] == 255)
     {
-        edge_right_trace = radial_sweep(pixels, edge_right, 10, 1);
+        edge_right_trace = radial_sweep(pixels, edge_right, 30, 1);
         edge_right_missing = 0;
     }
 
@@ -339,12 +193,18 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
     vec2_t edge_left_dir = {edge_left_trace.x - edge_left.x, edge_left_trace.y - edge_left.y};
     vec2_t edge_right_dir = {edge_right_trace.x - edge_right.x, edge_right_trace.y - edge_right.y};
 
-    vec2_t track_dir_estimated;
+    vec2_t track_dir_estimated = {0, -1};
     if (!edge_left_missing && !edge_right_missing)
     {
         /* No edges missing so average of the 2 will be a good estimation of track direction. */
-        track_dir_estimated.x = (edge_left_dir.x + edge_right_dir.x) / 2;
-        track_dir_estimated.y = (edge_left_dir.y + edge_right_dir.y) / 2;
+        float const edge_left_inv_40length = 40.0f / sqrt(edge_left_dir.x * edge_left_dir.x + edge_left_dir.y * edge_left_dir.y);
+        float const edge_right_inv_40length = 40.0f / sqrt(edge_right_dir.x * edge_right_dir.x + edge_right_dir.y * edge_right_dir.y);
+
+        track_dir_estimated.x = ((edge_left_dir.x * edge_left_inv_40length) + (edge_right_dir.x * edge_right_inv_40length)) / 2;
+        track_dir_estimated.y = ((edge_left_dir.y * edge_left_inv_40length) + (edge_right_dir.y * edge_right_inv_40length)) / 2;
+
+        draw_q_square((point2_t){edge_left.x + edge_left_dir.x, edge_left.y + edge_left_dir.y}, 10, 120);
+        draw_q_square((point2_t){edge_right.x + edge_right_dir.x, edge_right.y + edge_right_dir.y}, 10, 120);
     }
     else if (edge_left_missing && edge_right_missing)
     {
@@ -352,12 +212,12 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
         track_dir_estimated.x = 0;
         track_dir_estimated.y = -1; /* Defaulting to straight ahead. */
     }
-    else if (edge_right_missing)
+    else if (edge_right_missing && !edge_left_missing)
     {
         /* Right edge missing so left is used directly. */
         track_dir_estimated = edge_left_dir;
     }
-    else
+    else if (edge_left_missing && !edge_right_missing)
     {
         /* Left edge missing so right is used directly. */
         track_dir_estimated = edge_right_dir;
@@ -371,14 +231,13 @@ static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
  * @brief Track distances from the car to the furthest point ahead on the track if measured parallel
  * to the track.
  * @param pixels A segmented frame.
- * @param center Starting point of the raycast.
+ * @param center_black Starting point of the raycast. It must sit on top of a black pixel.
+ * @param dir_track Forward direction of the track.
  * @return Distance ahead of the car to the edge of the track (mesures paralell to the track along
  * the centerline).
  */
-static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center)
+static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center_black, vec2_t const dir_track)
 {
-    point2_t const center_black = {center.x, center.y - 20};
-    vec2_t const dir_track = track_orientation(pixels, center_black);
     float const dir_track_inv_length = 1 / sqrt(dir_track.x * dir_track.x + dir_track.y * dir_track.y);
 
     /* Normalize track direction to a known length. */
@@ -414,13 +273,46 @@ static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRA
     draw_q_square((point2_t){dir4.x + center_black.x, dir4.y + center_black.y}, 10, 150);
 
     uint16_t distance_total = 0;
-    distance_total += raycast(pixels, center_black, dir0);
-    distance_total += raycast(pixels, center_black, dir1);
-    distance_total += raycast(pixels, center_black, dir2);
-    distance_total += raycast(pixels, center_black, dir3);
-    distance_total += raycast(pixels, center_black, dir4);
+    raycast(pixels, center_black, dir0, &raycast_callback);
+    distance_total += ray_length_last;
+    raycast(pixels, center_black, dir1, &raycast_callback);
+    distance_total += ray_length_last;
+    raycast(pixels, center_black, dir2, &raycast_callback);
+    distance_total += ray_length_last;
+    raycast(pixels, center_black, dir3, &raycast_callback);
+    distance_total += ray_length_last;
+    raycast(pixels, center_black, dir4, &raycast_callback);
+    distance_total += ray_length_last;
     distance_total /= 5;
     return distance_total;
+}
+
+/**
+ * @brief Shootout a "tree" like structure in the direction of @p track_dir i.e. the forward
+ * direction of the track.
+ * @param pixels Frame where to shoot the tree.
+ * @param center_black Center of the track. It must sit on top of a black pixel.
+ * @param track_dir Forward direction of the track. XXX: Not sure what this will return yet.
+ */
+static void track_topology_tree_cast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center_black, vec2_t const track_dir)
+{
+    float const track_dir_inv_length = 1.0f / sqrt(track_dir.x * track_dir.x + track_dir.y * track_dir.y);
+    raycast(pixels, center_black, track_dir, &raycast_callback);
+    float const track_dir_inv_hit_length = ray_length_last * track_dir_inv_length;
+    vec2_t const center_ray_hit = {track_dir.x * track_dir_inv_hit_length, track_dir.y * track_dir_inv_hit_length};
+
+    float const track_dir_mat_data[2] = {track_dir.x, track_dir.y};
+    matf_t const track_dir_mat = {(float *)&track_dir_mat_data, 2, 1};
+
+    // for (uint16_t branch_len = 0; branch_len < track_dir_inv_hit_length; branch_len += 100)
+    // {
+    //     draw_q_number(track_dir_inv_hit_length, (point2_t){10, 100}, 3);
+    //     point2_t const branch_start = {center_black.x + track_dir.x * (track_dir_inv_length * branch_len),
+    //                                    center_black.y + track_dir.y * (track_dir_inv_length * branch_len)};
+    //     draw_q_square(branch_start, 10, 160);
+    //     raycast(pixels, branch_start, (vec2_t){-1, 0});
+    //     raycast(pixels, branch_start, (vec2_t){1, 0});
+    // }
 }
 
 int plnr_init()
@@ -441,8 +333,42 @@ int plnr_init()
 int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     point2_t const center = track_center(pixels, 210);
-    uint16_t distance_ahead = track_distance(pixels, center);
-    draw_q_number(distance_ahead, (point2_t){10, 100}, 4);
+    point2_t const center_black = (point2_t){center.x, center.y - 14};
+    point2_t const edge_left = track_edge(pixels, center_black, 1);
+    point2_t const edge_right = track_edge(pixels, center_black, 0);
+    vec2_t const dir_track = track_orientation(pixels, edge_left, edge_right);
+    // uint16_t distance_ahead = track_distance(pixels, center_black, dir_track);
+    // draw_q_number(distance_ahead, (point2_t){10, 100}, 4);
+    //track_topology_tree_cast(pixels, center_black, dir_track);
+
+    draw_q_square((point2_t){dir_track.x + center_black.x, dir_track.y + center_black.y}, 10, 150);
+    draw_q_square(center_black, 10, 150);
+
+    float dir_track_slope = (-(float)dir_track.x / dir_track.y) * 1.2f;
+    if (dir_track_slope > 1.0f)
+    {
+        dir_track_slope = 1.0f;
+    }
+    else if (dir_track_slope < -1.0f)
+    {
+        dir_track_slope = -1.0f;
+    }
+    else if (dir_track.y == 0)
+    {
+        dir_track_slope = 1.0f;
+    }
+
+    float target = 0.7f * dir_track_slope + 0.3f * ((((center_black.x) / (float)TCO_FRAME_WIDTH) * 2.0f) - 1.0f);
+    target *= 1.4f;
+    if (target > 1.0f)
+    {
+        target = 1.0f;
+    }
+    else if (target < -1.0f)
+    {
+        target = -1.0f;
+    }
+    draw_q_square((point2_t){((target + 1.0f) / 2.0f) * TCO_FRAME_WIDTH, 400}, 20, 200);
 
     if (sem_wait(shmem_sem_plan) == -1)
     {
@@ -452,7 +378,7 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     /* START: Critical section */
     shmem_plan_open = 1;
     shmem_plan->valid = 1;
-    shmem_plan->target = ((center.x / (float)TCO_FRAME_WIDTH) * 2.0f) - 1.0f;
+    shmem_plan->target = target;
     shmem_plan->frame_id += 1;
     /* END: Critical section */
     if (sem_post(shmem_sem_plan) == -1)

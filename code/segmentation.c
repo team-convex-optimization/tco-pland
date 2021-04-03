@@ -16,14 +16,12 @@ void segment(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
                 (*pixels)[height_idx][width_idx] = 255;
                 continue;
             }
-
             else if (height_idx + look_ahead_length < TCO_FRAME_HEIGHT &&
                      abs((*pixels)[height_idx][width_idx] - (*pixels)[height_idx + look_ahead_length][width_idx]) > delta_threshold)
             {
                 (*pixels)[height_idx][width_idx] = 255;
                 continue;
             }
-
             else
             {
                 (*pixels)[height_idx][width_idx] = 0;
