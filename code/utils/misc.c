@@ -27,7 +27,7 @@ uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
 
     for (;;)
     {
-        if (pixel_action(pixels, (point2_t){x, y}) != 0)
+        if (pixel_action != NULL && pixel_action(pixels, (point2_t){x, y}) != 0)
         {
             break;
         }
@@ -56,6 +56,7 @@ point2_t radial_sweep(
     point2_t const start,
     uint16_t const contour_length,
     uint8_t const cw_or_ccw,
+    float const radial_start,
     float const radial_len_max,
     uint8_t *const status)
 {
@@ -107,16 +108,10 @@ point2_t radial_sweep(
     uint16_t const circ_idx_270deg = quarter_size;
 
     buf_circ_t circ_buf = {(void *)circ_data, circ_size, circ_size - 1, sizeof(vec2_t)};
-    uint16_t circ_idx = 0;
+    uint16_t circ_idx = radial_start * circ_size;
+    draw_q_square((point2_t){start.x + circ_data[circ_idx].x, start.y + circ_data[circ_idx].y}, 4, 150);
     point2_t trace_last = start;
-    if (cw_or_ccw)
-    {
-        circ_idx = circ_idx_90deg;
-    }
-    else
-    {
-        circ_idx = circ_idx_270deg;
-    }
+
     for (uint16_t contour_length_now = 0; contour_length_now < contour_length; contour_length_now++)
     {
         for (uint16_t swept_pts = 0; swept_pts < circ_size - 1; swept_pts++)
@@ -144,7 +139,7 @@ point2_t radial_sweep(
             draw_q_pixel(trace_target, 120);
 
             /* End current sweep when a white point is found and move onto the next one. */
-            if ((*pixels)[trace_target.y][trace_target.x] == 255)
+            if ((*pixels)[trace_target.y][trace_target.x] > 0)
             {
                 trace_last = trace_target;
                 /* Sweep from a normal to the current point. */

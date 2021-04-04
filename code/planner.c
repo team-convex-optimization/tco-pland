@@ -22,8 +22,6 @@ static struct tco_shmem_data_plan *shmem_plan;
 static sem_t *shmem_sem_plan;
 static uint8_t shmem_training_open = 0;
 static uint8_t shmem_plan_open = 0;
-static vec2_t track_dir_last = {0, -1};
-static point2_t track_center_black_last = {TCO_FRAME_WIDTH / 2, 210 - 10};
 
 static uint8_t const track_center_count = 4;
 static uint16_t track_centers_data[track_center_count] = {0};
@@ -121,12 +119,12 @@ static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
 }
 
 /**
- * @brief Runs for ever pixels traced by a raycast.
+ * @brief A callback that draws a 'light' colored pixel and stops at white.
  * @param pixels A segmented frame.
  * @param point Last point of the raycast.
  * @return 0 if cast should continue and -1 if cast should stop.
  */
-static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+static uint8_t cb_draw_light_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
     if ((*pixels)[point.y][point.x] != 255)
     {
@@ -137,35 +135,15 @@ static uint8_t raycast_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FR
 }
 
 /**
- * @brief Runs for ever pixels traced by a raycast. It sets all points on the raycast to white on the image permanently.
+ * @brief A callback that draws a 'light' colored pixel and does not stop at anything.
  * @param pixels A segmented frame.
  * @param point Last point of the raycast.
  * @return 0 if cast should continue and -1 if cast should stop.
  */
-static uint8_t raycast_draw_callback(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+static uint8_t cb_draw_light_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
-    if ((*pixels)[point.y][point.x] != 255)
-    {
-        (*pixels)[point.y][point.x] = 255;
-        if (point.x - 2 > 0)
-        {
-            (*pixels)[point.y][point.x - 2] = 255;
-        }
-        if (point.x - 1 > 0)
-        {
-            (*pixels)[point.y][point.x - 1] = 255;
-        }
-        if (point.x + 1 < TCO_FRAME_WIDTH)
-        {
-            (*pixels)[point.y][point.x + 1] = 255;
-        }
-        if (point.x + 2 < TCO_FRAME_WIDTH)
-        {
-            (*pixels)[point.y][point.x + 2] = 255;
-        }
-        return 0;
-    }
-    return -1;
+    draw_q_pixel(point, 120);
+    return 0;
 }
 
 /**
@@ -208,11 +186,11 @@ static vec2_t track_edge_dir(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
         uint8_t status_sweep;
         if (left_or_right)
         {
-            edge_traced = radial_sweep(pixels, edge_start, 20, 0, 1.0f, &status_sweep);
+            edge_traced = radial_sweep(pixels, edge_start, 20, 0, 0.25f, 1.0f, &status_sweep);
         }
         else
         {
-            edge_traced = radial_sweep(pixels, edge_start, 20, 1, 1.0f, &status_sweep);
+            edge_traced = radial_sweep(pixels, edge_start, 20, 1, 0.75f, 1.0f, &status_sweep);
         }
 
         if (edge_start.x != edge_traced.x && edge_start.y != edge_traced.y)
@@ -324,11 +302,11 @@ static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRA
     draw_q_square((point2_t){dir4.x + center_black.x, dir4.y + center_black.y}, 10, 150);
 
     uint16_t distance_total = 0;
-    distance_total += raycast(pixels, center_black, dir0, &raycast_callback);
-    distance_total += raycast(pixels, center_black, dir1, &raycast_callback);
-    distance_total += raycast(pixels, center_black, dir2, &raycast_callback);
-    distance_total += raycast(pixels, center_black, dir3, &raycast_callback);
-    distance_total += raycast(pixels, center_black, dir4, &raycast_callback);
+    distance_total += raycast(pixels, center_black, dir0, &cb_draw_light_stop_white);
+    distance_total += raycast(pixels, center_black, dir1, &cb_draw_light_stop_white);
+    distance_total += raycast(pixels, center_black, dir2, &cb_draw_light_stop_white);
+    distance_total += raycast(pixels, center_black, dir3, &cb_draw_light_stop_white);
+    distance_total += raycast(pixels, center_black, dir4, &cb_draw_light_stop_white);
     return distance_total / 5;
 }
 
@@ -347,22 +325,69 @@ int plnr_init()
     return EXIT_SUCCESS;
 }
 
+float vec_to_sweep_start(vec2_t const vec)
+{
+    float vec_inv_len;
+    vec2_inv_length(&vec, &vec_inv_len);
+    float sweep_start = (atan2f(vec.y * vec_inv_len, vec.x * vec_inv_len) / M_PI);
+    if (isnan(sweep_start))
+    {
+        sweep_start = 0.0f;
+    }
+
+    if ((sweep_start <= 1.0 && sweep_start >= 0.75f) || (sweep_start >= -1.0 && sweep_start <= -0.75f))
+    {
+        sweep_start = 0.75f;
+    }
+    else if (sweep_start <= 0.75f && sweep_start >= 0.25f)
+    {
+        sweep_start = 0.5f;
+    }
+    else if ((sweep_start <= 0.25f && sweep_start >= 0.0f) || (sweep_start >= -0.25f && sweep_start <= 0.0f))
+    {
+        sweep_start = 0.25f;
+    }
+    else if (sweep_start <= -0.25f && sweep_start >= -0.75f)
+    {
+        sweep_start = 0.0f;
+    }
+    return sweep_start;
+}
+
 int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     point2_t const center = track_center(pixels, 210);
     point2_t const center_black = (point2_t){center.x, center.y - 10};
-    track_center_black_last = center_black;
+    // track_center_black_last = center_black;
 
-    point2_t const edge_left = track_edge(pixels, center_black, 1);
-    point2_t const edge_right = track_edge(pixels, center_black, 0);
-    vec2_t const dir_track = track_orientation(pixels, edge_left, edge_right);
-    track_dir_last = dir_track;
-
+    // vec2_t const dir_track = track_orientation(pixels, edge_left, edge_right);
+    // track_dir_last = dir_track;
     // uint16_t distance_ahead = track_distance(pixels, center_black, dir_track);
 
-    draw_q_square((point2_t){dir_track.x + center_black.x, dir_track.y + center_black.y}, 10, 150);
-    raycast(pixels, center_black, dir_track, &raycast_callback);
-    draw_q_square(center_black, 10, 150);
+    point2_t edge_left = track_edge(pixels, center_black, 1);
+    float edge_left_sweep_start = 0.25f;
+    point2_t edge_right = track_edge(pixels, center_black, 0);
+    float edge_right_sweep_start = 0.75f;
+    for (uint16_t pt_i = 0; pt_i < 10; pt_i++)
+    {
+        uint8_t status;
+        point2_t const edge_left_last = edge_left;
+        edge_left = radial_sweep(pixels, edge_left, 8, 0, edge_left_sweep_start, 1.0f, &status);
+        /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
+        vec2_t const edge_left_sweep_start_vec = {-(edge_left.y - edge_left_last.y), edge_left.x - edge_left_last.x}; /* Normal to delta vector. */
+        edge_left_sweep_start = vec_to_sweep_start(edge_left_sweep_start_vec);
+
+        point2_t const edge_right_last = edge_right;
+        edge_right = radial_sweep(pixels, edge_right, 8, 1, edge_right_sweep_start, 1.0f, &status);
+        /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
+        vec2_t const edge_right_sweep_start_vec = {edge_right.y - edge_right_last.y, -(edge_right.x - edge_right_last.x)}; /* Normal to delta vector. */
+        edge_right_sweep_start = vec_to_sweep_start(edge_right_sweep_start_vec);
+
+        bresenham(pixels, &cb_draw_light_stop_no, edge_left, edge_right);
+
+        draw_q_square(edge_left, 4, 120);
+        draw_q_square(edge_right, 4, 120);
+    }
 
     if (sem_wait(shmem_sem_plan) == -1)
     {
