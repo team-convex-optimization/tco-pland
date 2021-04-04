@@ -10,7 +10,6 @@
 #include "tco_shmem.h"
 #include "tco_linalg.h"
 
-#include "segmentation.h"
 #include "draw.h"
 
 typedef struct line

@@ -6,14 +6,14 @@
 #include "buf_circ.h"
 #include "draw.h"
 
-void bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
-               uint8_t (*pixel_action)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const),
-               point2_t const start,
-               point2_t const end)
+uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
+                   uint8_t (*pixel_action)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const),
+                   point2_t const start,
+                   point2_t const end)
 {
     if (start.x >= TCO_FRAME_WIDTH || end.x >= TCO_FRAME_WIDTH || start.y >= TCO_FRAME_HEIGHT || end.y >= TCO_FRAME_HEIGHT)
     {
-        return;
+        return 0;
     }
 
     int16_t dx = abs(end.x - start.x), sx = start.x < end.x ? 1 : -1;
@@ -22,6 +22,8 @@ void bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
 
     uint16_t x = start.x;
     uint16_t y = start.y;
+
+    uint16_t length = 0;
 
     for (;;)
     {
@@ -33,6 +35,7 @@ void bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
         {
             break;
         }
+        length++;
         e2 = 2 * err;
         if (e2 >= dy)
         {
@@ -45,11 +48,18 @@ void bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
             y += sy;
         } /* e_xy+e_y < 0 */
     }
+    return length;
 }
 
-point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const start, uint16_t const contour_length, uint8_t const cw_or_ccw)
+point2_t radial_sweep(
+    uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
+    point2_t const start,
+    uint16_t const contour_length,
+    uint8_t const cw_or_ccw,
+    float const radial_len_max,
+    uint8_t *const status)
 {
-    static uint16_t const trace_margin = 10;
+    static uint16_t const trace_margin = 6;
     /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
     /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
     static vec2_t const circ_data[] = {
@@ -91,6 +101,7 @@ point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]
         {-1, -6},
     };
     uint16_t const circ_size = sizeof(circ_data) / sizeof(vec2_t);
+    uint16_t const radial_count_max = radial_len_max * circ_size;
     uint16_t const quarter_size = circ_size / 4;
     uint16_t const circ_idx_90deg = quarter_size + quarter_size + quarter_size;
     uint16_t const circ_idx_270deg = quarter_size;
@@ -113,12 +124,21 @@ point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]
             vec2_t const circ_vec = *((vec2_t *)buf_circ_get(&circ_buf, circ_idx));
             point2_t const trace_target = {trace_last.x + circ_vec.x, trace_last.y + circ_vec.y};
 
-            /* Outside bounds */
+            /* Outside bounds. Also stop if the traced radial length is too long. */
             if (trace_target.y >= TCO_FRAME_HEIGHT - trace_margin ||
                 trace_last.x >= TCO_FRAME_WIDTH - trace_margin ||
                 trace_last.x <= trace_margin ||
-                trace_target.y <= trace_margin)
+                trace_target.y <= trace_margin ||
+                swept_pts >= radial_count_max)
             {
+                if (swept_pts >= radial_count_max)
+                {
+                    *status = 3;
+                }
+                else
+                {
+                    *status = 2;
+                }
                 return trace_last;
             }
             draw_q_pixel(trace_target, 120);
@@ -153,17 +173,19 @@ point2_t radial_sweep(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]
             prematurely.  */
             if (swept_pts >= circ_size - 1)
             {
+                *status = 1;
                 return trace_last;
             }
         }
     }
+    *status = 0;
     return trace_last;
 }
 
-void raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
-             point2_t const start,
-             vec2_t const dir,
-             uint8_t (*const callback)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const))
+uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
+                 point2_t const start,
+                 vec2_t const dir,
+                 uint8_t (*const callback)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const))
 {
     /* How much to stretch the direction vector so it touches the frame border. */
     float const edge_stretch_x = dir.x < 0 ? start.x / fabs((float)dir.x) : (TCO_FRAME_WIDTH - 1 - start.x) / fabs((float)dir.x);
@@ -175,5 +197,5 @@ void raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
     vec2_t const dir_stretched = {dir.x * edge_stretch, dir.y * edge_stretch};
     point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
 
-    bresenham(pixels, callback, (point2_t){start.x, start.y}, end);
+    return bresenham(pixels, callback, (point2_t){start.x, start.y}, end);
 }

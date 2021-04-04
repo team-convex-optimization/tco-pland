@@ -7,7 +7,7 @@
 #include "tco_shmem.h"
 
 #include "cam_mgr.h"
-#include "segmentation.h"
+#include "pre_proc.h"
 #include "planner.h"
 #include "draw.h"
 
@@ -16,16 +16,7 @@ const int draw_enabled = 1;
 
 void user_proc_func(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args)
 {
-  for (size_t y = 211; y < TCO_FRAME_HEIGHT; y++)
-  {
-    for (size_t x = 0; x < TCO_FRAME_WIDTH; x++)
-    {
-      /* 80~the floor shade of gray so that segment doesn't see the jump from floor to black as a
-      track edge. */
-      (*pixels)[y][x] = 40;
-    }
-  }
-  segment(pixels);
+  pre_proc(pixels);
   plnr_step(pixels);
   draw_run(pixels);
 }
@@ -51,7 +42,6 @@ int main(int argc, char *argv[])
 
   if (argc == 2 && (strcmp(argv[1], "--sandbox") == 0 || strcmp(argv[1], "-s") == 0))
   {
-
     return cam_mgr_run(0, &user_proc_func, NULL, &user_deinit);
   }
   else
