@@ -26,6 +26,8 @@ uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
  * @brief Perform a fast but rough radial sweep contour trace. It will trace at most @p
  * contour_length pixels and will travel in @p cw_or_ccw (clockwise or counter-clockwise) direction.
  * @param pixels A segmented frame.
+ * @param circ_data List of arrays that indicate an offset from the origin at (0,0) to each point on a circle.
+ * @param circ_data_len Number of points on the circle.
  * @param start Where the the tracing should start from. It can be on black or white.
  * @param contour_length Max number of traced pixels.
  * @param cw_or_ccw Begin tracing clockwise or counter-clockwise.
@@ -38,6 +40,8 @@ uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
  */
 point2_t radial_sweep(
     uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
+    vec2_t *const circ_data,
+    uint16_t const circ_data_len,
     point2_t const start,
     uint16_t const contour_length,
     uint8_t const cw_or_ccw,

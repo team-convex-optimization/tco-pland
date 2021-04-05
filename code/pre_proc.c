@@ -109,22 +109,14 @@ static void dilate(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], u
 
 void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
-    uint8_t const kern_1si[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
+    uint8_t const kern_1s[9] = {1, 1, 1, 1, 1, 1, 1, 1, 1};
 
     uint8_t const color_floor = 80; /* 0 - 255 */
-    uint8_t const border_size = 4;
-    for (uint16_t y = 0; y < TCO_FRAME_HEIGHT; y++)
+    uint8_t const border_size = 1;
+    for (uint16_t y = 211; y < TCO_FRAME_HEIGHT; y++)
     {
-        if (y >= 211)
-        {
-            memset(&(*pixels)[y][0], color_floor, TCO_FRAME_WIDTH);
-        }
-        else
-        {
-            memset(&(*pixels)[y][0], color_floor, border_size);
-            memset(&(*pixels)[y][TCO_FRAME_WIDTH - border_size], color_floor, border_size);
-        }
+        memset(&(*pixels)[y][0], color_floor, TCO_FRAME_WIDTH);
     }
     segment(pixels);
-    dilate(pixels, kern_1si);
+    dilate(pixels, kern_1s);
 }

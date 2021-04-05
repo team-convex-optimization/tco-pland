@@ -53,6 +53,8 @@ uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
 
 point2_t radial_sweep(
     uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
+    vec2_t *const circ_data,
+    uint16_t const circ_data_len,
     point2_t const start,
     uint16_t const contour_length,
     uint8_t const cw_or_ccw,
@@ -60,48 +62,9 @@ point2_t radial_sweep(
     float const radial_len_max,
     uint8_t *const status)
 {
-    static uint16_t const trace_margin = 6;
-    /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
-    /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
-    static vec2_t const circ_data[] = {
-        {0, -6},
-        {1, -6},
-        {2, -6},
-        {3, -5},
-        {4, -5},
-        {5, -4},
-        {5, -3},
-        {6, -2},
-        {6, -1},
-        {6, 0},
-        {6, 1},
-        {6, 2},
-        {5, 3},
-        {5, 4},
-        {4, 5},
-        {3, 5},
-        {2, 6},
-        {1, 6},
-        {0, 6},
-        {-1, 6},
-        {-2, 6},
-        {-3, 5},
-        {-4, 5},
-        {-5, 4},
-        {-5, 3},
-        {-6, 2},
-        {-6, 1},
-        {-6, 0},
-        {-6, -1},
-        {-6, -2},
-        {-5, -3},
-        {-5, -4},
-        {-4, -5},
-        {-3, -5},
-        {-2, -6},
-        {-1, -6},
-    };
-    uint16_t const circ_size = sizeof(circ_data) / sizeof(vec2_t);
+    static uint16_t const trace_margin = 10;
+
+    uint16_t const circ_size = circ_data_len;
     uint16_t const radial_count_max = radial_len_max * circ_size;
     uint16_t const quarter_size = circ_size / 4;
     uint16_t const circ_idx_90deg = quarter_size + quarter_size + quarter_size;
@@ -109,7 +72,7 @@ point2_t radial_sweep(
 
     buf_circ_t circ_buf = {(void *)circ_data, circ_size, circ_size - 1, sizeof(vec2_t)};
     uint16_t circ_idx = radial_start * circ_size;
-    draw_q_square((point2_t){start.x + circ_data[circ_idx].x, start.y + circ_data[circ_idx].y}, 4, 150);
+    // draw_q_square((point2_t){start.x + circ_data[circ_idx].x, start.y + circ_data[circ_idx].y}, 4, 150);
     point2_t trace_last = start;
 
     for (uint16_t contour_length_now = 0; contour_length_now < contour_length; contour_length_now++)
@@ -136,7 +99,7 @@ point2_t radial_sweep(
                 }
                 return trace_last;
             }
-            draw_q_pixel(trace_target, 120);
+            // draw_q_pixel(trace_target, 120);
 
             /* End current sweep when a white point is found and move onto the next one. */
             if ((*pixels)[trace_target.y][trace_target.x] > 0)

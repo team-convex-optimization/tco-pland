@@ -25,22 +25,47 @@ static uint8_t shmem_plan_open = 0;
 
 static uint16_t const track_width = 300; /* Pixels */
 
-/* All these matrices have been generated using the 'tco_matrix_gen' utility. */
-/* Rotation matrix: [[cos(20 deg) -sin(20 deg)], [sin(20 deg) cos(20 deg)]] */
-static float const rot_cw20_mat_data[4] = {0.939692620786f, -0.342020143326f, 0.342020143326f, 0.939692620786f};
-static matf_t const rot_cw20_matrix = {(float *)rot_cw20_mat_data, 2, 2};
-
-/* Rotation matrix: [[cos(-20 deg) -sin(-20 deg)], [sin(-20 deg) cos(-20 deg)]] */
-static float const rot_ccw20_mat_data[4] = {0.939692620786f, 0.342020143326f, -0.342020143326f, 0.939692620786f};
-static matf_t const rot_ccw20_matrix = {(float *)rot_ccw20_mat_data, 2, 2};
-
-/* Rotation matrix: [[cos(10 deg) -sin(10 deg)], [sin(10 deg) cos(10 deg)]] */
-static float const rot_cw10_mat_data[4] = {0.984807753012f, -0.173648177667f, 0.173648177667f, 0.984807753012f};
-static matf_t const rot_cw10_matrix = {(float *)rot_cw10_mat_data, 2, 2};
-
-/* Rotation matrix: [[cos(-10 deg) -sin(-10 deg)], [sin(-10 deg) cos(-10 deg)]] */
-static float const rot_ccw10_mat_data[4] = {0.984807753012f, 0.173648177667f, -0.173648177667f, 0.984807753012f};
-static matf_t const rot_ccw10_matrix = {(float *)rot_ccw10_mat_data, 2, 2};
+/* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
+/* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
+static vec2_t const circ_data[] = {
+    {0, -6},
+    {1, -6},
+    {2, -6},
+    {3, -5},
+    {4, -5},
+    {5, -4},
+    {5, -3},
+    {6, -2},
+    {6, -1},
+    {6, 0},
+    {6, 1},
+    {6, 2},
+    {5, 3},
+    {5, 4},
+    {4, 5},
+    {3, 5},
+    {2, 6},
+    {1, 6},
+    {0, 6},
+    {-1, 6},
+    {-2, 6},
+    {-3, 5},
+    {-4, 5},
+    {-5, 4},
+    {-5, 3},
+    {-6, 2},
+    {-6, 1},
+    {-6, 0},
+    {-6, -1},
+    {-6, -2},
+    {-5, -3},
+    {-5, -4},
+    {-4, -5},
+    {-3, -5},
+    {-2, -6},
+    {-1, -6},
+};
+static const uint16_t circ_data_len = sizeof(circ_data) / sizeof(vec2_t);
 
 /**
  * @brief Given a list of uint16_t values, finds the median and returns it.
@@ -157,6 +182,21 @@ static uint8_t cb_draw_perm_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TC
 }
 
 /**
+ * @brief A callback that stops at white and does nothing else.
+ * @param pixels A segmented frame.
+ * @param point Last point of the raycast.
+ * @return 0 if cast should continue and -1 if cast should stop.
+ */
+static uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+{
+    if ((*pixels)[point.y][point.x] != 255)
+    {
+        return 0;
+    }
+    return -1;
+}
+
+/**
  * @brief Find an edge of the track.
  * @param pixels A segmented frame where to search.
  * @param center_black Where to start searching. This must be the track center and must lie on top
@@ -180,144 +220,149 @@ static point2_t track_edge(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_W
 }
 
 /**
- * @brief Given a point where the edge starts, this returns the direction that edge is pointed in.
- * @param pixels A segmented frame.
- * @param left_or_right Select if traced edge is the left or right edge.
- * @param edge_start Where the edge starts.
- * @return Forward direction of the edge.
+ * @brief Given a vector, this function determines the sweep start fraction based on the angle by
+ * finding where the vector intersects with a unit circle then finding the fraction of perimeter
+ * from the 0 point (up) where that intersection lies. 
+ * @note It boils down to converting from a range of arctan ((0 deg) 0-Pi (180 deg) -Pi-0 (0 deg))
+ * to a range of 0-1 i.e. 90 deg at 0 to wrapping around to 90 deg at 1.
+ * @param vec
+ * @return Sweep start fraction.
  */
-static vec2_t track_edge_dir(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint8_t const left_or_right, point2_t const edge_start)
+static float vec_to_sweep_start(vec2_t const vec)
 {
-    point2_t edge_traced;
-    uint8_t edge_missing = 1;
+    float vec_inv_len;
+    vec2_inv_length(&vec, &vec_inv_len);
+    float sweep_start = (atan2f(vec.y * vec_inv_len, vec.x * vec_inv_len) / M_PI);
 
-    if ((*pixels)[edge_start.y][edge_start.x] == 255)
+    if (isnan(sweep_start))
     {
-        uint8_t status_sweep;
-        if (left_or_right)
+        sweep_start = 0.0f;
+    }
+
+    /* Converts the 0-Pi -Pi-0 range to 0-1 as required by radial sweep. */
+    if (sweep_start >= 0) /* 0 to Pi */
+    {
+        sweep_start = 0.25 + (sweep_start * 0.5f);
+    }
+    else if (sweep_start <= -0.5f) /* -Pi/2 to -Pi */
+    {
+        sweep_start = 0.75f + (0.25f * (1.0f - ((-sweep_start - 0.5f) * 2.0f)));
+    }
+    else /* 0 to -Pi/2 */
+    {
+        sweep_start = 0.25f * (1.0f - (-sweep_start * 2.0f));
+    }
+
+    return sweep_start;
+}
+
+/**
+ * @brief Given a line (origin and direction), it finds where the line intersects with the track and
+ * find the midpoint between that and the origin point.
+ * @param line Line to find midpoint of. Direction must be short (ideally under 10 pixels).
+ * @return Midpoint.
+ */
+static point2_t track_line_midpoint(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], line2_t const line)
+{
+    uint16_t ray_len = raycast(pixels, (point2_t){line.orig.x + line.dir.x, line.orig.y + line.dir.y}, line.dir, &cb_draw_no_stop_white);
+    if (ray_len > track_width / 2)
+    {
+        ray_len = track_width / 2;
+    }
+
+    vec2_t hit_vec = line.dir;
+    vec2_length_change(&hit_vec, ray_len / 2);
+    return (point2_t){line.orig.x + hit_vec.x, line.orig.y + hit_vec.y};
+}
+
+static void segment_track(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center_black)
+{
+    float const sweep_start_offset = 0.1f;
+    point2_t edge[2] = {track_edge(pixels, center_black, 1), track_edge(pixels, center_black, 0)};
+    float edge_sweep_start[2] = {0.25f, 0.75f};
+    uint8_t edge_stop[2] = {0, 0};
+    uint8_t edge_diverged[2] = {0, 0};
+
+    uint8_t const pt_num = 4;
+    for (uint16_t pt_i = 0; pt_i < pt_num; pt_i++)
+    {
+        uint8_t sweep_status;
+        /* Repeat the same for left and right. */
+        for (uint8_t edge_idx = 0; edge_idx < 2; edge_idx++)
         {
-            edge_traced = radial_sweep(pixels, edge_start, 20, 0, 0.25f, 1.0f, &status_sweep);
+            if (!edge_stop[edge_idx] && !edge_diverged[edge_idx])
+            {
+                point2_t const edge_last = edge[edge_idx];
+                if (edge_idx == 0)
+                {
+                    edge[0] = radial_sweep(pixels, (vec2_t *)&circ_data, circ_data_len, edge[0], 8, 0, edge_sweep_start[0], 1.0f, &sweep_status);
+                }
+                else
+                {
+                    edge[1] = radial_sweep(pixels, (vec2_t *)&circ_data, circ_data_len, edge[1], 8, 1, edge_sweep_start[1], 1.0f, &sweep_status);
+                }
+                /* If something abnormal happened e.g. reached frame edge, etc... */
+                if (sweep_status != 0)
+                {
+                    edge_stop[edge_idx] = 1;
+                }
+                else if (abs(edge[edge_idx].x - center_black.x) > track_width * 0.7f)
+                {
+                    edge_diverged[edge_idx] = 1;
+                }
+
+                /* Using vector between old and new edge point, find the ideal sweep start fraction
+                for radial sweep. */
+                if (edge_idx == 0)
+                {
+                    vec2_t const edge_sweep_start_vec = {-(edge[0].y - edge_last.y), edge[0].x - edge_last.x}; /* Normal to delta vector. */
+                    edge_sweep_start[0] = vec_to_sweep_start(edge_sweep_start_vec);
+                    edge_sweep_start[0] -= sweep_start_offset;
+                    if (edge_sweep_start[0] < 0.0f)
+                    {
+                        edge_sweep_start[0] = 0.0f;
+                    }
+                }
+                else
+                {
+                    vec2_t const edge_sweep_start_vec = {edge[1].y - edge_last.y, -(edge[1].x - edge_last.x)}; /* Normal to delta vector. */
+                    edge_sweep_start[1] = vec_to_sweep_start(edge_sweep_start_vec);
+                    edge_sweep_start[1] += sweep_start_offset;
+                    if (edge_sweep_start[1] > 1.0f)
+                    {
+                        edge_sweep_start[1] = 1.0f;
+                    }
+                }
+            }
+        }
+        if (!edge_stop[1] || !edge_stop[0])
+        {
+            /* The sweep start dir vector can be used directly since its length is known to be the
+            circle radius which is negligible and does not need to be normalized to 1. */
+            point2_t midpoint;
+            if (!edge_stop[0] && edge_stop[1])
+            {
+                float const sweep_start = edge_sweep_start[0] + sweep_start_offset > 1.0f ? 1.0f : edge_sweep_start[0] + sweep_start_offset;
+                vec2_t const sweep_start_dir = circ_data[(uint16_t)((circ_data_len - 1) * sweep_start)];
+                midpoint = track_line_midpoint(pixels, (line2_t){edge[0], sweep_start_dir});
+            }
+            else if (edge_stop[0] && !edge_stop[1])
+            {
+                float const sweep_start = edge_sweep_start[1] - sweep_start_offset < 0.0f ? 0.0f : edge_sweep_start[1] - sweep_start_offset;
+                vec2_t const sweep_start_dir = circ_data[(uint16_t)((circ_data_len - 1) * sweep_start)];
+                midpoint = track_line_midpoint(pixels, (line2_t){edge[1], sweep_start_dir});
+            }
+            else
+            {
+                midpoint = (point2_t){(edge[0].x + edge[1].x) / 2, (edge[0].y + edge[1].y) / 2};
+            }
+            draw_q_square(midpoint, 4, 120);
         }
         else
         {
-            edge_traced = radial_sweep(pixels, edge_start, 20, 1, 0.75f, 1.0f, &status_sweep);
+            break;
         }
-
-        if (edge_start.x != edge_traced.x && edge_start.y != edge_traced.y)
-        {
-            edge_missing = 0;
-        }
-
-        vec2_t const edge_dir = {edge_traced.x - edge_start.x, edge_traced.y - edge_start.y};
-        return edge_dir;
     }
-    return (vec2_t){0, 0}; /* Missing edge. */
-}
-
-/**
- * @brief Returns a vector in the forward direction of the track.
- * @param pixels The frame.
- * @param edge_left Left edge of the track.
- * @param edge_right Right edge of the track.
- * @return A vector in the forward direction of the track. No guarantees on magnitude.
- */
-static vec2_t track_orientation(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const edge_left, point2_t const edge_right)
-{
-    static vec2_t dir_last;
-
-    /* If an edge is missing, the corresponding vector will be {0,0}. */
-    vec2_t edge_left_dir = track_edge_dir(pixels, 1, edge_left);
-    vec2_t edge_right_dir = track_edge_dir(pixels, 0, edge_right);
-
-    uint8_t const edge_left_missing = edge_left_dir.x == 0 && edge_left_dir.y == 0 ? 1 : 0;
-    uint8_t const edge_right_missing = edge_right_dir.x == 0 && edge_right_dir.y == 0 ? 1 : 0;
-
-    /* Defaulting to straight ahead. */
-    vec2_t track_dir_estimated = {0, -40};
-    if (!edge_left_missing && !edge_right_missing)
-    {
-        /* No edges missing so average of the 2 will be a good estimation of track direction. */
-        float const edge_left_inv_100length = 100.0f / sqrt(edge_left_dir.x * edge_left_dir.x + edge_left_dir.y * edge_left_dir.y);
-        float const edge_right_inv_100length = 100.0f / sqrt(edge_right_dir.x * edge_right_dir.x + edge_right_dir.y * edge_right_dir.y);
-
-        track_dir_estimated.x = ((edge_left_dir.x * edge_left_inv_100length) + (edge_right_dir.x * edge_right_inv_100length)) / 2;
-        track_dir_estimated.y = ((edge_left_dir.y * edge_left_inv_100length) + (edge_right_dir.y * edge_right_inv_100length)) / 2;
-
-        draw_q_square((point2_t){edge_left.x + edge_left_dir.x, edge_left.y + edge_left_dir.y}, 10, 120);
-        draw_q_square((point2_t){edge_right.x + edge_right_dir.x, edge_right.y + edge_right_dir.y}, 10, 120);
-    }
-    else if (edge_right_missing && !edge_left_missing)
-    {
-        /* Right edge missing so left is used directly. */
-        track_dir_estimated = edge_left_dir;
-    }
-    else if (edge_left_missing && !edge_right_missing)
-    {
-        /* Left edge missing so right is used directly. */
-        track_dir_estimated = edge_right_dir;
-    }
-    else
-    {
-        track_dir_estimated = dir_last;
-    }
-    dir_last = track_dir_estimated;
-
-    /* TODO: Apply direction heuristics. */
-    return track_dir_estimated;
-}
-
-/**
- * @brief Track distances from the car to the furthest point ahead on the track if measured parallel
- * to the track.
- * @param pixels A segmented frame.
- * @param center_black Starting point of the raycast. It must sit on top of a black pixel.
- * @param dir_track Forward direction of the track.
- * @return Distance ahead of the car to the edge of the track (mesures paralell to the track along
- * the centerline).
- */
-static uint16_t track_distance(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const center_black, vec2_t const dir_track)
-{
-    float const dir_track_inv_length = 1.0f / sqrt(dir_track.x * dir_track.x + dir_track.y * dir_track.y);
-
-    /* Normalize track direction to a known length. */
-    float const track_dir_short_data[2] = {dir_track.x * dir_track_inv_length * 40.0f, dir_track.y * dir_track_inv_length * 40.0f};
-    matf_t const track_dir_short_mat = {(float *)track_dir_short_data, 2, 1};
-
-    float vec_rot_cw20_data[2];
-    float vec_rot_ccw20_data[2];
-    float vec_rot_cw10_data[2];
-    float vec_rot_ccw10_data[2];
-    matf_t vec_rot_cw20 = {(float *)vec_rot_cw20_data, 2, 1};
-    matf_t vec_rot_ccw20 = {(float *)vec_rot_ccw20_data, 2, 1};
-    matf_t vec_rot_cw10 = {(float *)vec_rot_cw10_data, 2, 1};
-    matf_t vec_rot_ccw10 = {(float *)vec_rot_ccw10_data, 2, 1};
-
-    /* Create two vectors, one rotated clockwise and other counter-clockwise relative to track
-    direction. */
-    matf_mul_matf(&rot_cw20_matrix, &track_dir_short_mat, &vec_rot_cw20);
-    matf_mul_matf(&rot_ccw20_matrix, &track_dir_short_mat, &vec_rot_ccw20);
-    matf_mul_matf(&rot_cw10_matrix, &track_dir_short_mat, &vec_rot_cw10);
-    matf_mul_matf(&rot_ccw10_matrix, &track_dir_short_mat, &vec_rot_ccw10);
-
-    vec2_t const dir0 = {track_dir_short_data[0], track_dir_short_data[1]};
-    vec2_t const dir1 = {vec_rot_cw20_data[0], vec_rot_cw20_data[1]};
-    vec2_t const dir2 = {vec_rot_ccw20_data[0], vec_rot_ccw20_data[1]};
-    vec2_t const dir3 = {vec_rot_cw10_data[0], vec_rot_cw10_data[1]};
-    vec2_t const dir4 = {vec_rot_ccw10_data[0], vec_rot_ccw10_data[1]};
-
-    draw_q_square((point2_t){dir0.x + center_black.x, dir0.y + center_black.y}, 10, 100);
-    draw_q_square((point2_t){dir1.x + center_black.x, dir1.y + center_black.y}, 10, 150);
-    draw_q_square((point2_t){dir2.x + center_black.x, dir2.y + center_black.y}, 10, 150);
-    draw_q_square((point2_t){dir3.x + center_black.x, dir3.y + center_black.y}, 10, 150);
-    draw_q_square((point2_t){dir4.x + center_black.x, dir4.y + center_black.y}, 10, 150);
-
-    uint16_t distance_total = 0;
-    distance_total += raycast(pixels, center_black, dir0, &cb_draw_light_stop_white);
-    distance_total += raycast(pixels, center_black, dir1, &cb_draw_light_stop_white);
-    distance_total += raycast(pixels, center_black, dir2, &cb_draw_light_stop_white);
-    distance_total += raycast(pixels, center_black, dir3, &cb_draw_light_stop_white);
-    distance_total += raycast(pixels, center_black, dir4, &cb_draw_light_stop_white);
-    return distance_total / 5;
 }
 
 int plnr_init()
@@ -335,123 +380,11 @@ int plnr_init()
     return EXIT_SUCCESS;
 }
 
-float vec_to_sweep_start(vec2_t const vec)
-{
-    float vec_inv_len;
-    vec2_inv_length(&vec, &vec_inv_len);
-    float sweep_start = (atan2f(vec.y * vec_inv_len, vec.x * vec_inv_len) / M_PI);
-
-    if (isnan(sweep_start))
-    {
-        sweep_start = 0.0f;
-    }
-
-    if (sweep_start >= 0) /* 0 to Pi */
-    {
-        sweep_start = 0.25 + (sweep_start * 0.5f);
-    }
-    else if (sweep_start <= -0.5f) /* -Pi/2 to -Pi */
-    {
-        sweep_start = 0.75f + (0.25f * (1.0f - ((-sweep_start - 0.5f) * 2.0f)));
-    }
-    else /* 0 to -Pi/2 */
-    {
-        sweep_start = 0.25f * (1.0f - (-sweep_start * 2.0f));
-    }
-
-    return sweep_start;
-}
-
 int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     point2_t const center = track_center(pixels, 210);
     point2_t const center_black = (point2_t){center.x, center.y - 10};
-    // track_center_black_last = center_black;
-
-    // vec2_t const dir_track = track_orientation(pixels, edge_left, edge_right); track_dir_last =
-    // dir_track; uint16_t distance_ahead = track_distance(pixels, center_black, dir_track);
-
-    point2_t edge_left = track_edge(pixels, center_black, 1);
-    point2_t edge_right = track_edge(pixels, center_black, 0);
-
-    point2_t const edge_left_first = edge_left;
-    point2_t const edge_right_first = edge_right;
-
-    float edge_left_sweep_start = 0.25f;
-    float edge_right_sweep_start = 0.75f;
-
-    uint8_t edge_left_stop = 0;
-    uint8_t edge_right_stop = 0;
-
-    uint8_t edge_left_diverged = 0;
-    uint8_t edge_right_diverged = 0;
-
-    for (uint16_t pt_i = 0; pt_i < 10; pt_i++)
-    {
-        uint8_t sweep_status;
-
-        if (!edge_left_stop && !edge_left_diverged)
-        {
-            point2_t const edge_left_last = edge_left;
-            edge_left = radial_sweep(pixels, edge_left, 8, 0, edge_left_sweep_start, 1.0f, &sweep_status);
-            /* If something abnormal happened e.g. reached frame edge, etc... */
-            if (sweep_status != 0)
-            {
-                edge_left_stop = 1;
-            }
-            else if (abs(edge_left.x - center_black.x) > track_width * 0.7f)
-            {
-                edge_left_diverged = 1;
-            }
-            /* Using vector between old and new edge point, find the ideal sweep start fraction for
-            radial sweep. */
-            vec2_t const edge_left_sweep_start_vec = {-(edge_left.y - edge_left_last.y), edge_left.x - edge_left_last.x}; /* Normal to delta vector. */
-            edge_left_sweep_start = vec_to_sweep_start(edge_left_sweep_start_vec);
-            edge_left_sweep_start -= 0.1f;
-            if (edge_left_sweep_start < 0.0f)
-            {
-                edge_left_sweep_start = 0.0f;
-            }
-            // raycast(pixels, edge_left, edge_left_sweep_start_vec, &cb_draw_light_stop_no);
-        }
-
-        if (!edge_right_stop && !edge_right_diverged)
-        {
-            point2_t const edge_right_last = edge_right;
-            edge_right = radial_sweep(pixels, edge_right, 8, 1, edge_right_sweep_start, 1.0f, &sweep_status);
-            /* If something abnormal happened e.g. reached frame edge, etc... */
-            if (sweep_status != 0)
-            {
-                edge_right_stop = 1;
-            }
-            else if (abs(edge_right.x - center_black.x) > track_width * 0.7f)
-            {
-                edge_right_diverged = 1;
-            }
-            /* Using vector between old and new edge point, find the ideal sweep start fraction for
-            radial sweep. */
-            vec2_t const edge_right_sweep_start_vec = {edge_right.y - edge_right_last.y, -(edge_right.x - edge_right_last.x)}; /* Normal to delta vector. */
-            edge_right_sweep_start = vec_to_sweep_start(edge_right_sweep_start_vec);
-            edge_right_sweep_start += 0.1f;
-            if (edge_right_sweep_start > 1.0f)
-            {
-                edge_right_sweep_start = 1.0f;
-            }
-            // raycast(pixels, edge_right, edge_right_sweep_start_vec, &cb_draw_light_stop_no);
-        }
-
-        if (!edge_right_stop || !edge_left_stop)
-        {
-            bresenham(pixels, &cb_draw_light_stop_no, edge_left, edge_right);
-
-            draw_q_square(edge_left, 4, 120);
-            draw_q_square(edge_right, 4, 120);
-        }
-        else
-        {
-            break;
-        }
-    }
+    segment_track(pixels, center_black);
 
     if (sem_wait(shmem_sem_plan) == -1)
     {
