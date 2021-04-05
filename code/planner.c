@@ -23,9 +23,7 @@ static sem_t *shmem_sem_plan;
 static uint8_t shmem_training_open = 0;
 static uint8_t shmem_plan_open = 0;
 
-static uint8_t const track_center_count = 4;
-static uint16_t track_centers_data[track_center_count] = {0};
-static buf_circ_t track_centers = {track_centers_data, track_center_count, track_center_count - 1, sizeof(uint16_t)};
+static uint16_t const track_width = 300; /* Pixels */
 
 /* All these matrices have been generated using the 'tco_matrix_gen' utility. */
 /* Rotation matrix: [[cos(20 deg) -sin(20 deg)], [sin(20 deg) cos(20 deg)]] */
@@ -57,7 +55,7 @@ static uint16_t listu16_median(uint16_t *const list, uint16_t const length)
     insertion_sort_integer((uint8_t *)list_cpy, length, sizeof(uint16_t), &comp_u16);
 
     uint16_t median;
-    if (track_center_count % 2 == 0)
+    if (length % 2 == 0)
     {
         /* Median of evenly long array is average of 2 central values. */
         median = (list_cpy[(length - 1) / 2] + list_cpy[((length - 1) / 2) + 1]) / 2;
@@ -104,8 +102,7 @@ static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
         region_largest_size = region_size;
     }
     uint16_t track_center_new = region_largest_start + (region_largest_size / 2);
-    buf_circ_add(&track_centers, &track_center_new);
-    point2_t const center = {listu16_median(track_centers_data, track_center_count), bottom_row_idx};
+    point2_t const center = {track_center_new, bottom_row_idx};
 
     /* Center should never be at x=0. */
     if (center.x == 0)
@@ -147,6 +144,19 @@ static uint8_t cb_draw_light_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][T
 }
 
 /**
+ * @brief A callback that draws a white pixel on the frame such that it affect further computation
+ * and does not stop at anything.
+ * @param pixels A segmented frame.
+ * @param point Last point of the raycast.
+ * @return 0 if cast should continue and -1 if cast should stop.
+ */
+static uint8_t cb_draw_perm_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+{
+    (*pixels)[point.y][point.x] = 255;
+    return 0;
+}
+
+/**
  * @brief Find an edge of the track.
  * @param pixels A segmented frame where to search.
  * @param center_black Where to start searching. This must be the track center and must lie on top
@@ -160,7 +170,7 @@ static point2_t track_edge(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_W
     uint16_t edge_x = center.x;
     while (edge_x > 0 && edge_x < TCO_FRAME_WIDTH)
     {
-        if ((*pixels)[center.y][edge_x] == 255)
+        if ((*pixels)[center.y][edge_x] == 255 || abs(center.x - edge_x) > (track_width / 2))
         {
             break;
         }
@@ -358,21 +368,29 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     point2_t const center_black = (point2_t){center.x, center.y - 10};
     // track_center_black_last = center_black;
 
-    // vec2_t const dir_track = track_orientation(pixels, edge_left, edge_right);
-    // track_dir_last = dir_track;
-    // uint16_t distance_ahead = track_distance(pixels, center_black, dir_track);
+    // vec2_t const dir_track = track_orientation(pixels, edge_left, edge_right); track_dir_last =
+    // dir_track; uint16_t distance_ahead = track_distance(pixels, center_black, dir_track);
 
     point2_t edge_left = track_edge(pixels, center_black, 1);
     point2_t edge_right = track_edge(pixels, center_black, 0);
+
+    point2_t const edge_left_first = edge_left;
+    point2_t const edge_right_first = edge_right;
+
     float edge_left_sweep_start = 0.25f;
     float edge_right_sweep_start = 0.75f;
+
     uint8_t edge_left_stop = 0;
     uint8_t edge_right_stop = 0;
+
+    uint8_t edge_left_diverged = 0;
+    uint8_t edge_right_diverged = 0;
+
     for (uint16_t pt_i = 0; pt_i < 10; pt_i++)
     {
         uint8_t sweep_status;
 
-        if (!edge_left_stop)
+        if (!edge_left_stop && !edge_left_diverged)
         {
             point2_t const edge_left_last = edge_left;
             edge_left = radial_sweep(pixels, edge_left, 8, 0, edge_left_sweep_start, 1.0f, &sweep_status);
@@ -381,7 +399,12 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
             {
                 edge_left_stop = 1;
             }
-            /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
+            else if (abs(edge_left.x - center_black.x) > track_width * 0.7f)
+            {
+                edge_left_diverged = 1;
+            }
+            /* Using vector between old and new edge point, find the ideal sweep start fraction for
+            radial sweep. */
             vec2_t const edge_left_sweep_start_vec = {-(edge_left.y - edge_left_last.y), edge_left.x - edge_left_last.x}; /* Normal to delta vector. */
             edge_left_sweep_start = vec_to_sweep_start(edge_left_sweep_start_vec);
             edge_left_sweep_start -= 0.1f;
@@ -392,7 +415,7 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
             // raycast(pixels, edge_left, edge_left_sweep_start_vec, &cb_draw_light_stop_no);
         }
 
-        if (!edge_right_stop)
+        if (!edge_right_stop && !edge_right_diverged)
         {
             point2_t const edge_right_last = edge_right;
             edge_right = radial_sweep(pixels, edge_right, 8, 1, edge_right_sweep_start, 1.0f, &sweep_status);
@@ -401,7 +424,12 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
             {
                 edge_right_stop = 1;
             }
-            /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
+            else if (abs(edge_right.x - center_black.x) > track_width * 0.7f)
+            {
+                edge_right_diverged = 1;
+            }
+            /* Using vector between old and new edge point, find the ideal sweep start fraction for
+            radial sweep. */
             vec2_t const edge_right_sweep_start_vec = {edge_right.y - edge_right_last.y, -(edge_right.x - edge_right_last.x)}; /* Normal to delta vector. */
             edge_right_sweep_start = vec_to_sweep_start(edge_right_sweep_start_vec);
             edge_right_sweep_start += 0.1f;
