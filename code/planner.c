@@ -330,27 +330,25 @@ float vec_to_sweep_start(vec2_t const vec)
     float vec_inv_len;
     vec2_inv_length(&vec, &vec_inv_len);
     float sweep_start = (atan2f(vec.y * vec_inv_len, vec.x * vec_inv_len) / M_PI);
+
     if (isnan(sweep_start))
     {
         sweep_start = 0.0f;
     }
 
-    if ((sweep_start <= 1.0 && sweep_start >= 0.75f) || (sweep_start >= -1.0 && sweep_start <= -0.75f))
+    if (sweep_start >= 0) /* 0 to Pi */
     {
-        sweep_start = 0.75f;
+        sweep_start = 0.25 + (sweep_start * 0.5f);
     }
-    else if (sweep_start <= 0.75f && sweep_start >= 0.25f)
+    else if (sweep_start <= -0.5f) /* -Pi/2 to -Pi */
     {
-        sweep_start = 0.5f;
+        sweep_start = 0.75f + (0.25f * (1.0f - ((-sweep_start - 0.5f) * 2.0f)));
     }
-    else if ((sweep_start <= 0.25f && sweep_start >= 0.0f) || (sweep_start >= -0.25f && sweep_start <= 0.0f))
+    else /* 0 to -Pi/2 */
     {
-        sweep_start = 0.25f;
+        sweep_start = 0.25f * (1.0f - (-sweep_start * 2.0f));
     }
-    else if (sweep_start <= -0.25f && sweep_start >= -0.75f)
-    {
-        sweep_start = 0.0f;
-    }
+
     return sweep_start;
 }
 
@@ -365,28 +363,66 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     // uint16_t distance_ahead = track_distance(pixels, center_black, dir_track);
 
     point2_t edge_left = track_edge(pixels, center_black, 1);
-    float edge_left_sweep_start = 0.25f;
     point2_t edge_right = track_edge(pixels, center_black, 0);
+    float edge_left_sweep_start = 0.25f;
     float edge_right_sweep_start = 0.75f;
+    uint8_t edge_left_stop = 0;
+    uint8_t edge_right_stop = 0;
     for (uint16_t pt_i = 0; pt_i < 10; pt_i++)
     {
-        uint8_t status;
-        point2_t const edge_left_last = edge_left;
-        edge_left = radial_sweep(pixels, edge_left, 8, 0, edge_left_sweep_start, 1.0f, &status);
-        /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
-        vec2_t const edge_left_sweep_start_vec = {-(edge_left.y - edge_left_last.y), edge_left.x - edge_left_last.x}; /* Normal to delta vector. */
-        edge_left_sweep_start = vec_to_sweep_start(edge_left_sweep_start_vec);
+        uint8_t sweep_status;
 
-        point2_t const edge_right_last = edge_right;
-        edge_right = radial_sweep(pixels, edge_right, 8, 1, edge_right_sweep_start, 1.0f, &status);
-        /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
-        vec2_t const edge_right_sweep_start_vec = {edge_right.y - edge_right_last.y, -(edge_right.x - edge_right_last.x)}; /* Normal to delta vector. */
-        edge_right_sweep_start = vec_to_sweep_start(edge_right_sweep_start_vec);
+        if (!edge_left_stop)
+        {
+            point2_t const edge_left_last = edge_left;
+            edge_left = radial_sweep(pixels, edge_left, 8, 0, edge_left_sweep_start, 1.0f, &sweep_status);
+            /* If something abnormal happened e.g. reached frame edge, etc... */
+            if (sweep_status != 0)
+            {
+                edge_left_stop = 1;
+            }
+            /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
+            vec2_t const edge_left_sweep_start_vec = {-(edge_left.y - edge_left_last.y), edge_left.x - edge_left_last.x}; /* Normal to delta vector. */
+            edge_left_sweep_start = vec_to_sweep_start(edge_left_sweep_start_vec);
+            edge_left_sweep_start -= 0.1f;
+            if (edge_left_sweep_start < 0.0f)
+            {
+                edge_left_sweep_start = 0.0f;
+            }
+            // raycast(pixels, edge_left, edge_left_sweep_start_vec, &cb_draw_light_stop_no);
+        }
 
-        bresenham(pixels, &cb_draw_light_stop_no, edge_left, edge_right);
+        if (!edge_right_stop)
+        {
+            point2_t const edge_right_last = edge_right;
+            edge_right = radial_sweep(pixels, edge_right, 8, 1, edge_right_sweep_start, 1.0f, &sweep_status);
+            /* If something abnormal happened e.g. reached frame edge, etc... */
+            if (sweep_status != 0)
+            {
+                edge_right_stop = 1;
+            }
+            /* Using vector between old and new edge point, find the ideal sweep start fraction for radial sweep. */
+            vec2_t const edge_right_sweep_start_vec = {edge_right.y - edge_right_last.y, -(edge_right.x - edge_right_last.x)}; /* Normal to delta vector. */
+            edge_right_sweep_start = vec_to_sweep_start(edge_right_sweep_start_vec);
+            edge_right_sweep_start += 0.1f;
+            if (edge_right_sweep_start > 1.0f)
+            {
+                edge_right_sweep_start = 1.0f;
+            }
+            // raycast(pixels, edge_right, edge_right_sweep_start_vec, &cb_draw_light_stop_no);
+        }
 
-        draw_q_square(edge_left, 4, 120);
-        draw_q_square(edge_right, 4, 120);
+        if (!edge_right_stop || !edge_left_stop)
+        {
+            bresenham(pixels, &cb_draw_light_stop_no, edge_left, edge_right);
+
+            draw_q_square(edge_left, 4, 120);
+            draw_q_square(edge_right, 4, 120);
+        }
+        else
+        {
+            break;
+        }
     }
 
     if (sem_wait(shmem_sem_plan) == -1)
