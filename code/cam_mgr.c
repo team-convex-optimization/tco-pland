@@ -132,6 +132,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
     struct timespec const delta_time = {0, compute_user_data->frame_end_times[1].tv_nsec - compute_user_data->frame_end_times[0].tv_nsec};
     if (fps_counter > 0 && delta_time.tv_nsec >= nanos_in_sec)
     {
+        log_info("fps: %u", fps_now);
         fps_now = fps_counter;
         memset(&compute_user_data->frame_end_times[0], 0, sizeof(struct timespec));
         memset(&compute_user_data->frame_end_times[1], 0, sizeof(struct timespec));

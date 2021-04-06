@@ -110,7 +110,7 @@ void grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 
                 if (ray_len > 10 && border_size > 3)
                 {
-                    log_debug("[g]x: %u, ray num: %u", x, ray_num);
+                    //log_debug("[g]x: %u, ray num: %u", x, ray_num);
                     draw_q_square(start, 3, 120);
                     draw_q_square(end, 3, 100);
                     // if (!((ray_num + 1) % 2 == 0) ||
@@ -130,7 +130,7 @@ void grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
                 }
                 else
                 {
-                    log_debug("[b] x: %u, ray num: %u, bord: %u", x, ray_num, border_size);
+                    //log_debug("[b] x: %u, ray num: %u, bord: %u", x, ray_num, border_size);
                     border_size += ray_len;
                 }
             }
