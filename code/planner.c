@@ -141,62 +141,6 @@ static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
 }
 
 /**
- * @brief A callback that draws a 'light' colored pixel and stops at white.
- * @param pixels A segmented frame.
- * @param point Last point of the raycast.
- * @return 0 if cast should continue and -1 if cast should stop.
- */
-static uint8_t cb_draw_light_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
-{
-    if ((*pixels)[point.y][point.x] != 255)
-    {
-        draw_q_pixel(point, 120);
-        return 0;
-    }
-    return -1;
-}
-
-/**
- * @brief A callback that draws a 'light' colored pixel and does not stop at anything.
- * @param pixels A segmented frame.
- * @param point Last point of the raycast.
- * @return 0 if cast should continue and -1 if cast should stop.
- */
-static uint8_t cb_draw_light_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
-{
-    draw_q_pixel(point, 120);
-    return 0;
-}
-
-/**
- * @brief A callback that draws a white pixel on the frame such that it affect further computation
- * and does not stop at anything.
- * @param pixels A segmented frame.
- * @param point Last point of the raycast.
- * @return 0 if cast should continue and -1 if cast should stop.
- */
-static uint8_t cb_draw_perm_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
-{
-    (*pixels)[point.y][point.x] = 255;
-    return 0;
-}
-
-/**
- * @brief A callback that stops at white and does nothing else.
- * @param pixels A segmented frame.
- * @param point Last point of the raycast.
- * @return 0 if cast should continue and -1 if cast should stop.
- */
-static uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
-{
-    if ((*pixels)[point.y][point.x] != 255)
-    {
-        return 0;
-    }
-    return -1;
-}
-
-/**
  * @brief Find an edge of the track.
  * @param pixels A segmented frame where to search.
  * @param center_black Where to start searching. This must be the track center and must lie on top

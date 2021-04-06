@@ -17,7 +17,7 @@ const int draw_enabled = 1;
 void user_proc_func(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args)
 {
   pre_proc(pixels);
-  plnr_step(pixels);
+  // plnr_step(pixels);
   draw_run(pixels);
 }
 

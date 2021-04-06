@@ -112,7 +112,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
     uint8_t _Alignas(4) frame_processed_tmp[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
     memcpy(&frame_processed_tmp, pixels, frame_size_expected);
 
-    draw_q_number(fps_now, (point2_t){10, 10}, 4);
+    draw_q_number(fps_now, (point2_t){10, TCO_FRAME_HEIGHT - 50}, 4);
 
     /* Process image here by modifying 'frame_processed_tmp'. */
     cam_mgr_user_data_t *compute_user_data = args_ptr;

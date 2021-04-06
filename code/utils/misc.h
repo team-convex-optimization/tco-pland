@@ -5,6 +5,8 @@
 #include "tco_shmem.h"
 #include "tco_linalg.h"
 
+typedef uint8_t (*callback_func_t)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const);
+
 /**
  * @brief General purpose bresenham implementation. It takes in a callback which gets called for
  * every pixel traced by this algorithm.
@@ -18,7 +20,7 @@
  * @return Length of the line.
  */
 uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
-                   uint8_t (*pixel_action)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const),
+                   callback_func_t const pixel_action,
                    point2_t const start,
                    point2_t const end);
 
@@ -26,12 +28,14 @@ uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
  * @brief Perform a fast but rough radial sweep contour trace. It will trace at most @p
  * contour_length pixels and will travel in @p cw_or_ccw (clockwise or counter-clockwise) direction.
  * @param pixels A segmented frame.
- * @param circ_data List of arrays that indicate an offset from the origin at (0,0) to each point on a circle.
+ * @param circ_data List of arrays that indicate an offset from the origin at (0,0) to each point on
+ * a circle.
  * @param circ_data_len Number of points on the circle.
  * @param start Where the the tracing should start from. It can be on black or white.
  * @param contour_length Max number of traced pixels.
  * @param cw_or_ccw Begin tracing clockwise or counter-clockwise.
- * @param radial_start Where the tracing will begin on the circle. 0=up, 0.25=right, 0.5=down, 0.75=left
+ * @param radial_start Where the tracing will begin on the circle. 0=up, 0.25=right, 0.5=down,
+ * 0.75=left
  * @param radial_len_max Fraction of points on the circle that can be swept when looking for the
  * next point. If a sweep goes beyong this fraction, it stops
  * @param status Set to 0 if nothing is abnormal, 1 if stopped because swept whole circle without a
@@ -60,6 +64,39 @@ point2_t radial_sweep(
 uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
                  point2_t const start,
                  vec2_t const dir,
-                 uint8_t (*const callback)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const));
+                 callback_func_t const callback);
+
+/**
+ * @brief A callback that draws a 'light' colored pixel and stops at white.
+ * @param pixels A segmented frame.
+ * @param point Last point of the raycast.
+ * @return 0 if cast should continue and -1 if cast should stop.
+ */
+uint8_t cb_draw_light_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point);
+
+/**
+ * @brief A callback that draws a 'light' colored pixel and does not stop at anything.
+ * @param pixels A segmented frame.
+ * @param point Last point of the raycast.
+ * @return 0 if cast should continue and -1 if cast should stop.
+ */
+uint8_t cb_draw_light_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point);
+
+/**
+ * @brief A callback that draws a white pixel on the frame such that it affect further computation
+ * and does not stop at anything.
+ * @param pixels A segmented frame.
+ * @param point Last point of the raycast.
+ * @return 0 if cast should continue and -1 if cast should stop.
+ */
+uint8_t cb_draw_perm_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point);
+
+/**
+ * @brief A callback that stops at white and does nothing else.
+ * @param pixels A segmented frame.
+ * @param point Last point of the raycast.
+ * @return 0 if cast should continue and -1 if cast should stop.
+ */
+uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point);
 
 #endif /* _MISC_H_ */

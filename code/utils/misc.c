@@ -7,7 +7,7 @@
 #include "draw.h"
 
 uint16_t bresenham(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
-                   uint8_t (*pixel_action)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const),
+                   callback_func_t const pixel_action,
                    point2_t const start,
                    point2_t const end)
 {
@@ -143,7 +143,7 @@ point2_t radial_sweep(
 uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
                  point2_t const start,
                  vec2_t const dir,
-                 uint8_t (*const callback)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const))
+                 callback_func_t const callback)
 {
     /* How much to stretch the direction vector so it touches the frame border. */
     float const edge_stretch_x = dir.x < 0 ? start.x / fabs((float)dir.x) : (TCO_FRAME_WIDTH - 1 - start.x) / fabs((float)dir.x);
@@ -156,4 +156,35 @@ uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
     point2_t const end = {start.x + dir_stretched.x, start.y + dir_stretched.y};
 
     return bresenham(pixels, callback, (point2_t){start.x, start.y}, end);
+}
+
+uint8_t cb_draw_light_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+{
+    if ((*pixels)[point.y][point.x] != 255)
+    {
+        draw_q_pixel(point, 120);
+        return 0;
+    }
+    return -1;
+}
+
+uint8_t cb_draw_light_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+{
+    draw_q_pixel(point, 120);
+    return 0;
+}
+
+uint8_t cb_draw_perm_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+{
+    (*pixels)[point.y][point.x] = 255;
+    return 0;
+}
+
+uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
+{
+    if ((*pixels)[point.y][point.x] != 255)
+    {
+        return 0;
+    }
+    return -1;
 }
