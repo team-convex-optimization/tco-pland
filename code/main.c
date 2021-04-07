@@ -46,6 +46,6 @@ int main(int argc, char *argv[])
   }
   else
   {
-    return cam_mgr_run(1, &user_proc_func, NULL, &user_deinit);
+    return cam_mgr_run(1, NULL, NULL, &user_deinit);
   }
 }

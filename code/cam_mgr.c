@@ -25,7 +25,7 @@ typedef struct cam_mgr_user_data_t
 
 static struct tco_shmem_data_training *training_data;
 static sem_t *training_data_sem;
-static uint8_t shmem_open = 0; /* To ensure that semaphor is never left at 0 when forcing the app to exit. */
+static uint8_t shmem_training_open = 0; /* To ensure that semaphor is never left at 0 when forcing the app to exit. */
 static uint32_t const frame_size_expected = TCO_FRAME_WIDTH * TCO_FRAME_HEIGHT * sizeof(uint8_t);
 
 /* This will be accessed by multiple threads. The alignment is there to avoid problems when using
@@ -36,6 +36,7 @@ static pthread_mutex_t frame_processed_mutex;
 static uint8_t using_threads = 0;
 static pthread_t thread_display = {0};
 static pthread_t thread_camera_sim = {0};
+static pthread_t thread_camera = {0};
 static atomic_char exit_requested = 0; /* Gets written by all children threads and gets read in the main thread. */
 static cam_mgr_user_data_t compute_user_data;
 
@@ -184,7 +185,7 @@ static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAME
         atomic_store(&exit_requested, 1);
         exit(EXIT_FAILURE);
     }
-    shmem_open = 1;
+    shmem_training_open = 1;
     memcpy(pixel_dest, &(training_data->video), frame_size_expected);
     if (sem_post(training_data_sem) == -1)
     {
@@ -192,7 +193,7 @@ static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAME
         atomic_store(&exit_requested, 1);
         exit(EXIT_FAILURE);
     }
-    shmem_open = 0;
+    shmem_training_open = 0;
     clock_gettime(CLOCK_REALTIME, &time_end);
 
     /* Simulate the real camera by outputing a constant 30 fps. */
@@ -239,6 +240,38 @@ static void frame_processed_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO
 }
 
 /**
+ * @brief Receives camera frame and saves it in shmem.
+ * @param pixels The pointer to the raw grayscale frame received from the camera. It is also
+ * guaranteed that this array can only be read (not written).
+ * @param length The size of the pixels array in bytes.
+ * @param args_ptr This is ignored.
+ */
+static void frame_cam_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int length, void *args_ptr)
+{
+    if (length != frame_size_expected)
+    {
+        atomic_store(&exit_requested, 1);
+        exit(EXIT_FAILURE);
+    }
+
+    if (sem_wait(training_data_sem) == -1)
+    {
+        log_error("sem_wait: %s", strerror(errno));
+        atomic_store(&exit_requested, 1);
+        exit(EXIT_FAILURE);
+    }
+    shmem_training_open = 1;
+    memcpy(&training_data->video, pixels, frame_size_expected);
+    if (sem_post(training_data_sem) == -1)
+    {
+        log_error("sem_post: %s", strerror(errno));
+        atomic_store(&exit_requested, 1);
+        exit(EXIT_FAILURE);
+    }
+    shmem_training_open = 0;
+}
+
+/**
  * @brief A function which is meant to be run by a child thread and run the display pipeline i.e.
  * the pipeline which reads the processsed simulator frame and displays it on screen in a window.
  * @param arg Pointer to user data passed to this job.
@@ -275,6 +308,22 @@ static void *thread_job_camera_sim_pipeline(void *args)
 }
 
 /**
+ * @brief A function which is meant to be run by a child thread and run the real camera pipeline.
+ * @param arg Pointer to user data passed to this job.
+ */
+static void *thread_job_camera_pipeline(void *args)
+{
+    cam_user_data_t user_data_camera_sim = {{&frame_cam_processor, NULL}, {NULL, NULL}};
+    if (cam_pipeline_run(&user_data_camera_sim) != 0)
+    {
+        log_error("Failed to run the camera pipeline");
+    }
+    log_info("Camera thread is quitting");
+    atomic_store(&exit_requested, 1);
+    return NULL;
+}
+
+/**
  * @brief A helped function which registers the signal handler for all common signals.
  */
 static void register_signal_handler(void)
@@ -285,6 +334,42 @@ static void register_signal_handler(void)
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGHUP, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+}
+
+/**
+ * @brief Perform cleanup such that deadlocks never happen.
+ * @param user_deinit A user defined function which deinitializes userspace.
+ */
+static void cleanup(int (*user_deinit)(void))
+{
+    log_info("Cleaning up before termination");
+    if (shmem_training_open)
+    {
+        if (sem_post(training_data_sem) == -1)
+        {
+            log_error("sem_post: %s", strerror(errno));
+            log_error("Failed to close semaphore used to control access to training shmem");
+        }
+    }
+    if (using_threads)
+    {
+        if (pthread_cancel(thread_display) != 0)
+        {
+            log_error("Failed to cancel display thread");
+        }
+        if (pthread_cancel(thread_camera_sim) != 0)
+        {
+            log_error("Failed to cancel camera sim thread");
+        }
+        if (pthread_mutex_destroy(&frame_processed_mutex) != 0)
+        {
+            log_error("Failed to destroy mutex for accessing processed frame data");
+        }
+    }
+    if (user_deinit != NULL && user_deinit() != 0)
+    {
+        log_error("User defined deinit function failed");
+    }
 }
 
 /**
@@ -308,59 +393,42 @@ static void detect_and_handle_exit_requested(int (*user_deinit)(void))
         /* Wait until termination is requested. */
         nanosleep(&req, &rem);
     }
-
-    log_info("Cleaning up before termination");
-    if (shmem_open)
-    {
-        if (sem_post(training_data_sem) == -1)
-        {
-            log_error("sem_post: %s", strerror(errno));
-            log_error("Failed to close semaphore used to control access to training shmem");
-        }
-    }
-    if (using_threads)
-    {
-        if (pthread_cancel(thread_display) != 0)
-        {
-            log_error("Failed to cancel display thread");
-        }
-        if (pthread_cancel(thread_camera_sim) != 0)
-        {
-            log_error("Failed to cancel camera sim thread");
-        }
-        if (pthread_mutex_destroy(&frame_processed_mutex) != 0)
-        {
-            log_error("Failed to destroy mutex for accessing processed frame data");
-        }
-    }
-    if (user_deinit() != 0)
-    {
-        log_error("User defined deinit function failed");
-    }
+    cleanup(user_deinit);
 }
 
 /**
- * @brief Run the real camera pipeline which reads raw frames and passes them to a user controlled
- * processing function. 
+ * @brief Run the real camera pipeline which reads raw frames, saves them in shmem for the
+ * processing pipeline to pick it up and process.
  *
  * Since running a single pipeline does not require multiple children threads, it is ran from the
  * main thread.
- * @param proc_func A function which will process a frame and use its data in any way it wants.
- * @param proc_func_args Pointer to arguments which will be passed to proc_fucn when it is called.
- * @param user_deinit User defined deinit function that will be run before closing.
  * @return 0 on success and 1 on failure
  */
-static int run_camera_real(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int, void *), void *proc_func_args, int (*user_deinit)(void))
+static int run_camera_real()
 {
-    // TODO: Make this function handle user deinit correctly e.g. by running camera pipeline in a separate thread then polling for requested exit
-    compute_user_data.f = proc_func;
-    compute_user_data.args = proc_func_args;
-    cam_user_data_t user_data = {{frame_raw_processor, &compute_user_data}, {NULL, NULL}};
-    if (cam_pipeline_run(&user_data) != 0)
+    using_threads = 1;
+    register_signal_handler();
+    cam_user_data_t user_data = {{&frame_cam_processor, NULL}, {NULL, NULL}};
+
+    atomic_init(&exit_requested, 0);
+
+    if (shmem_map(TCO_SHMEM_NAME_TRAINING,
+                  TCO_SHMEM_SIZE_TRAINING,
+                  TCO_SHMEM_NAME_SEM_TRAINING,
+                  O_RDWR,
+                  (void **)&training_data,
+                  &training_data_sem) != 0)
     {
-        log_error("Failed to run the camera pipeline");
+        log_error("Failed to map shared memory and associated semaphore");
         return EXIT_FAILURE;
     }
+
+    if (pthread_create(&thread_camera, NULL, &thread_job_camera_pipeline, NULL) != 0)
+    {
+        log_error("Failed to create a thread for writing the camera frame to shmem");
+        return EXIT_FAILURE;
+    }
+    detect_and_handle_exit_requested(NULL);
     return EXIT_SUCCESS;
 }
 
@@ -385,7 +453,6 @@ static int run_camera_sim(void (*proc_func)(uint8_t (*)[TCO_FRAME_HEIGHT][TCO_FR
 
     atomic_init(&exit_requested, 0);
 
-    shmem_open = 1;
     /* This could also just be done inside the thread which uses it but would make cleanup more
     difficult. */
     if (shmem_map(TCO_SHMEM_NAME_TRAINING,
@@ -427,7 +494,7 @@ int cam_mgr_run(uint8_t real_or_sim, void (*proc_func)(uint8_t (*)[TCO_FRAME_HEI
 {
     if (real_or_sim)
     {
-        return run_camera_real(proc_func, proc_func_args, user_deinit);
+        return run_camera_real();
     }
     else
     {
