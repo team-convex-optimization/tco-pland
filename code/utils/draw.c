@@ -42,7 +42,7 @@ static const uint16_t queue_size_number = 512;
 static number_t queue_number[queue_size_number] = {0};
 static uint16_t queue_idx_number = 0;
 
-static const uint16_t queue_size_pixel = 8192;
+static const uint16_t queue_size_pixel = 16384;
 static pixel_t queue_pixel[queue_size_pixel] = {0};
 static uint16_t queue_idx_pixel = 0;
 

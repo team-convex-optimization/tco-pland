@@ -1,6 +1,10 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+/**
+ * @brief Collection of common functions and algorithm that don't have internal state and are shared across modules.
+ */
+
 #include <stdint.h>
 #include "tco_shmem.h"
 #include "tco_linalg.h"
@@ -98,5 +102,21 @@ uint8_t cb_draw_perm_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME
  * @return 0 if cast should continue and -1 if cast should stop.
  */
 uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point);
+
+/**
+ * @brief Find the track center in the provided frame.
+ * @param pixels The frame where the center will be found. It needs to be a segmented frame.
+ * @param bottomr_row_idx Defines the y index in the frame where the center should be found.
+ * @return Track center.
+ */
+point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx);
+
+/**
+ * @brief Find the track center in the provided frame which is above a black pixel.
+ * @param pixels The frame where the center will be found. It needs to be a segmented frame.
+ * @param bottomr_row_idx Defines the y index in the frame where the center should be found.
+ * @return Point over a black pixel closest to the track center.
+ */
+point2_t track_center_black(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx);
 
 #endif /* _MISC_H_ */

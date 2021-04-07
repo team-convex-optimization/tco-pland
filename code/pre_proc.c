@@ -5,6 +5,7 @@
 #include "tco_libd.h"
 #include "tco_linalg.h"
 
+#include "buf_circ.h"
 #include "pre_proc.h"
 #include "draw.h"
 #include "misc.h"
@@ -15,12 +16,14 @@ typedef struct region
     uint16_t size;
 } region_t;
 
+static uint16_t const frame_bot = 210; /* Where the usable frame ends in the y direction from the top. */
+
 /**
- * @brief Segment the image to lines (white (255)) and not-lines (black (0))
- * @param image a grayscale image which segments the image. 
+ * @brief algo_segment the image to lines (white (255)) and not-lines (black (0))
+ * @param image a grayscale image which algo_segments the image. 
  * @return the image is passed by reference. This reference is modified. 
  */
-static void segment(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
+static void algo_segment(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     uint8_t const delta_threshold = 60;
     uint8_t const look_ahead_length = 6;
@@ -86,15 +89,13 @@ static void morph_primitive(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_
     }
 }
 
-void grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
+void algo_grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
-    uint8_t draw = 0;
-    // uint16_t y = 140;
-    for (uint16_t y = 10; y < 211 - 10; y += 15)
+    for (uint16_t y = 30; y < 211 - 10; y += 10)
     {
         uint8_t ray_num = 0;
         uint16_t border_size = 0;
-        for (uint16_t x = 2; x < TCO_FRAME_WIDTH - 2; x++)
+        for (uint16_t x = 0; x < TCO_FRAME_WIDTH; x++)
         {
             if ((*pixels)[y][x] == 255)
             {
@@ -108,31 +109,22 @@ void grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
                 x += ray_len;
                 point2_t end = {x, y};
 
-                if (ray_len > 10 && border_size > 3)
+                if (ray_len > 16 && border_size > 4 && border_size < 150)
                 {
-                    //log_debug("[g]x: %u, ray num: %u", x, ray_num);
-                    draw_q_square(start, 3, 120);
-                    draw_q_square(end, 3, 100);
-                    // if (!((ray_num + 1) % 2 == 0) ||
-                    // (((ray_num + 1) % 2 == 0) && border_size > 10 && border_size < 100))
-                    // {
                     if (!((ray_num + 1) % 2 == 0))
                     {
+                        draw_q_square(start, 4, 120);
+                        draw_q_square(end, 4, 100);
+                        draw_q_square((point2_t){(end.x + start.x) / 2, (end.y + start.y) / 2}, 4, 200);
                         bresenham(pixels, &cb_draw_light_stop_no, start, end);
                     }
-                    // if ((ray_num + 1) % 2 == 0)
-                    // {
-                    // ray_num += 2;
-                    // }
-                    // }
                     ray_num++;
-                    border_size = 0;
                 }
                 else
                 {
-                    //log_debug("[b] x: %u, ray num: %u, bord: %u", x, ray_num, border_size);
                     border_size += ray_len;
                 }
+                border_size = 0;
             }
         }
     }
@@ -140,12 +132,12 @@ void grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 
 void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
-    uint8_t const color_floor = 90; /* 0 - 255 */
+    uint8_t const color_floor = 120; /* 0 - 255 */
     uint8_t const border_size = 6;
     for (uint16_t y = 0; y < TCO_FRAME_HEIGHT; y++)
     {
         uint8_t const color_floor_adaptive = color_floor - ((y / (float)TCO_FRAME_HEIGHT) * color_floor);
-        if (y < border_size || y >= 211)
+        if (y < border_size || y > frame_bot)
         {
             memset(&(*pixels)[y][0], color_floor_adaptive, TCO_FRAME_WIDTH);
         }
@@ -155,8 +147,8 @@ void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
             memset(&(*pixels)[y][TCO_FRAME_WIDTH - border_size], color_floor_adaptive, border_size);
         }
     }
-    segment(pixels);
+    algo_segment(pixels);
     morph_primitive(pixels, 1, 1); // Dilate 3x3
     morph_primitive(pixels, 0, 1); // Erode 3x3
-    grating(pixels);
+    // algo_grating(pixels);
 }

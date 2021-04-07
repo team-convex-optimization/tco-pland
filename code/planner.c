@@ -93,54 +93,6 @@ static uint16_t listu16_median(uint16_t *const list, uint16_t const length)
 }
 
 /**
- * @brief Find the track center in the provided frame.
- * @param pixels The frame where the center will be found. It needs to be a segmented frame.
- * @param bottomr_row_idx Defines the y index in the frame where the center should be found.
- * @return Track center.
- */
-static point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx)
-{
-    uint16_t region_largest_size = 0;
-    uint16_t region_largest_start = 0;
-    uint16_t region_size = 0;
-    uint16_t region_start = 0;
-    for (uint16_t x = 0; x < TCO_FRAME_WIDTH; x++)
-    {
-        if ((*pixels)[bottom_row_idx][x] == 255)
-        {
-            region_size += 1;
-        }
-        else
-        {
-            if (region_size > region_largest_size)
-            {
-                region_largest_start = region_start;
-                region_largest_size = region_size;
-            }
-            region_start = x;
-            region_size = 0;
-        }
-    }
-    if (region_size > region_largest_size)
-    {
-        region_largest_start = region_start;
-        region_largest_size = region_size;
-    }
-    uint16_t track_center_new = region_largest_start + (region_largest_size / 2);
-    point2_t const center = {track_center_new, bottom_row_idx};
-
-    /* Center should never be at x=0. */
-    if (center.x == 0)
-    {
-        return (point2_t){TCO_FRAME_WIDTH / 2, center.y};
-    }
-    else
-    {
-        return center;
-    }
-}
-
-/**
  * @brief Find an edge of the track.
  * @param pixels A segmented frame where to search.
  * @param center_black Where to start searching. This must be the track center and must lie on top
@@ -326,8 +278,7 @@ int plnr_init()
 
 int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
-    point2_t const center = track_center(pixels, 210);
-    point2_t const center_black = (point2_t){center.x, center.y - 10};
+    point2_t const center_black = track_center_black(pixels, 210);
     segment_track(pixels, center_black);
 
     if (sem_wait(shmem_sem_plan) == -1)

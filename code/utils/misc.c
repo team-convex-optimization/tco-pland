@@ -188,3 +188,56 @@ uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAM
     }
     return -1;
 }
+
+point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx)
+{
+    uint16_t region_largest_size = 0;
+    uint16_t region_largest_start = 0;
+    uint16_t region_size = 0;
+    uint16_t region_start = 0;
+    for (uint16_t x = 0; x < TCO_FRAME_WIDTH; x++)
+    {
+        if ((*pixels)[bottom_row_idx][x] == 255)
+        {
+            region_size += 1;
+        }
+        else
+        {
+            if (region_size > region_largest_size)
+            {
+                region_largest_start = region_start;
+                region_largest_size = region_size;
+            }
+            region_start = x;
+            region_size = 0;
+        }
+    }
+    if (region_size > region_largest_size)
+    {
+        region_largest_start = region_start;
+        region_largest_size = region_size;
+    }
+    uint16_t track_center_new = region_largest_start + (region_largest_size / 2);
+    point2_t const center = {track_center_new, bottom_row_idx};
+
+    /* Center should never be at x=0. */
+    if (center.x == 0)
+    {
+        return (point2_t){TCO_FRAME_WIDTH / 2, center.y};
+    }
+    else
+    {
+        return center;
+    }
+}
+
+point2_t track_center_black(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx)
+{
+    point2_t const center = track_center(pixels, bottom_row_idx);
+    point2_t center_black = center;
+    while (center_black.y - 1 > 0 && (*pixels)[center_black.y][center_black.x] != 0)
+    {
+        center_black.y--;
+    }
+    return center_black;
+}

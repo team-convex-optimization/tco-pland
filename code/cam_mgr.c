@@ -47,7 +47,7 @@ static cam_mgr_user_data_t compute_user_data;
  */
 static void handle_signals(int sig)
 {
-    /* TODO: Not all signals should just quit. */
+    /* XXX: Not all signals should just quit. */
     atomic_store(&exit_requested, 1);
 }
 
@@ -128,7 +128,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
         clock_gettime(CLOCK_REALTIME, &compute_user_data->frame_end_times[1]);
     }
     /* Delta is calculated assuming the seconds fields are 0 which they should be in 1 frame. */
-    static uint64_t const nanos_in_sec = 1000000000;
+    uint64_t const nanos_in_sec = 1000000000;
     struct timespec const delta_time = {0, compute_user_data->frame_end_times[1].tv_nsec - compute_user_data->frame_end_times[0].tv_nsec};
     if (fps_counter > 0 && delta_time.tv_nsec >= nanos_in_sec)
     {
