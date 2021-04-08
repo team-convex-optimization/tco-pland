@@ -17,7 +17,6 @@ clang \
     -Wall \
     -std=c11 \
     -D _DEFAULT_SOURCE \
-    -D TRAINING \
     -I ../code \
     -I ../code/utils \
     -I ../lib/tco_libd/include \

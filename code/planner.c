@@ -16,11 +16,11 @@
 #include "misc.h"
 #include "buf_circ.h"
 
-static struct tco_shmem_data_training *shmem_training;
-static sem_t *shmem_sem_training;
+static struct tco_shmem_data_state *shmem_state;
+static sem_t *shmem_sem_state;
 static struct tco_shmem_data_plan *shmem_plan;
 static sem_t *shmem_sem_plan;
-static uint8_t shmem_training_open = 0;
+static uint8_t shmem_state_open = 0;
 static uint8_t shmem_plan_open = 0;
 
 static uint16_t const track_width = 300; /* Pixels */
@@ -263,9 +263,9 @@ static void segment_track(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
 
 int plnr_init()
 {
-    if (shmem_map(TCO_SHMEM_NAME_TRAINING, TCO_SHMEM_SIZE_TRAINING, TCO_SHMEM_NAME_SEM_TRAINING, O_RDONLY, (void **)&shmem_training, &shmem_sem_training) != 0)
+    if (shmem_map(TCO_SHMEM_NAME_STATE, TCO_SHMEM_SIZE_STATE, TCO_SHMEM_NAME_SEM_STATE, O_RDONLY, (void **)&shmem_state, &shmem_sem_state) != 0)
     {
-        log_error("Failed to map training shmem into process memory");
+        log_error("Failed to map state shmem into process memory");
         return EXIT_FAILURE;
     }
     if (shmem_map(TCO_SHMEM_NAME_PLAN, TCO_SHMEM_SIZE_PLAN, TCO_SHMEM_NAME_SEM_PLAN, O_RDWR, (void **)&shmem_plan, &shmem_sem_plan) != 0)
@@ -288,8 +288,8 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     }
     /* START: Critical section */
     shmem_plan_open = 1;
-    shmem_plan->valid = 1;
-    shmem_plan->target = 0.0f;
+    shmem_plan->target_pos += 0.01f;
+    shmem_plan->target_speed += 0.01f;
     shmem_plan->frame_id += 1;
     /* END: Critical section */
     if (sem_post(shmem_sem_plan) == -1)
@@ -311,9 +311,9 @@ int plnr_deinit()
             return EXIT_FAILURE;
         }
     }
-    if (shmem_training_open)
+    if (shmem_state_open)
     {
-        if (sem_post(shmem_sem_training) == -1)
+        if (sem_post(shmem_sem_state) == -1)
         {
             log_error("sem_post: %s", strerror(errno));
             return EXIT_FAILURE;

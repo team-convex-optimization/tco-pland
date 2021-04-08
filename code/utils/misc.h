@@ -119,4 +119,12 @@ point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]
  */
 point2_t track_center_black(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx);
 
+/**
+ * @brief Check if given coordinates lie within a frame.
+ * @param x Horizontal coordinate.
+ * @param y Vertical coordinate.
+ * @return 0 if inside bounds, 1 if not.
+ */
+uint8_t check_bounds_inside(int16_t x, int16_t y);
+
 #endif /* _MISC_H_ */

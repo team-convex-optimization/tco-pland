@@ -241,3 +241,15 @@ point2_t track_center_black(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_
     }
     return center_black;
 }
+
+uint8_t check_bounds_inside(int16_t x, int16_t y)
+{
+    if (x >= 0 && x < TCO_FRAME_WIDTH && y >= 0 && y < TCO_FRAME_HEIGHT)
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}

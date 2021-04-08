@@ -9,6 +9,7 @@
 #include "pre_proc.h"
 #include "draw.h"
 #include "misc.h"
+#include "stack_dyna.h"
 
 typedef struct region
 {
@@ -89,7 +90,7 @@ static void morph_primitive(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_
     }
 }
 
-void algo_grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
+static void algo_grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     for (uint16_t y = 30; y < 211 - 10; y += 10)
     {
@@ -130,6 +131,27 @@ void algo_grating(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     }
 }
 
+static void span_fill(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const origin)
+{
+    if ((*pixels)[origin.y][origin.x] == 255)
+    {
+        return;
+    }
+
+    point2_t pt;
+    uint16_t x1;
+    uint8_t span_above, span_below;
+
+    stack_dyna_t stack = {NULL, 0, 0, sizeof(point2_t)};
+
+    /* TODO: Finish this. */
+
+    if (stack.data != NULL)
+    {
+        free(stack.data);
+    }
+}
+
 void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     uint8_t const color_floor = 120; /* 0 - 255 */
@@ -148,7 +170,8 @@ void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
         }
     }
     algo_segment(pixels);
-    morph_primitive(pixels, 1, 1); // Dilate 3x3
-    morph_primitive(pixels, 0, 1); // Erode 3x3
-    // algo_grating(pixels);
+    morph_primitive(pixels, 1, 1); /* Dilate 3x3 */
+    morph_primitive(pixels, 0, 1); /* Erode 3x3 */
+    point2_t const center_black = track_center_black(pixels, frame_bot);
+    span_fill(pixels, center_black);
 }
