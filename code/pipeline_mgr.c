@@ -57,7 +57,7 @@ static void handle_signals(int sig)
 }
 
 /**
- * @brief A helped function which registers the signal handler for all common signals.
+ * @brief A helper function which registers the signal handler for all common signals.
  */
 static void register_signal_handler(void)
 {
@@ -259,7 +259,8 @@ static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAME
 
     while (1)
     {
-        if (data_state->frame_id > frame_id_last)
+        /* The '!=' ensures that when id wraps around, this will still work. */
+        if (data_state->frame_id != frame_id_last)
         {
             if (sem_wait(data_state_sem) == -1)
             {
