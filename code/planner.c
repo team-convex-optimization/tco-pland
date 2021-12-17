@@ -276,10 +276,27 @@ int plnr_init()
     return EXIT_SUCCESS;
 }
 
+/**
+ * @brief Calculate the best position to be in according to the current *segmented* frame
+ * @param pixels is passed as a ptr
+ * @param target_pos is the desired position (-1 left edge, 1 right edge, 0 center) of current frame
+ * @param target_speed is the speed to go at (m/s). NOTE This unit can easily be changed
+ * @return void. values are passed through @p target_pos and @p target_speed pointers. 
+ */
+void calculate_next_position(const uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
+    *target_pos = 0.0f; 
+    *target_speed = 0.0f;
+}
+
+
 int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
     point2_t const center_black = track_center_black(pixels, 210);
     segment_track(pixels, center_black);
+
+    /* Calculate the next coordinate */
+    float target_pos = 0, target_speed = 0;
+    calculate_next_position(pixels, &target_pos, &target_speed);
 
     if (sem_wait(shmem_sem_plan) == -1)
     {
@@ -288,8 +305,8 @@ int plnr_step(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
     }
     /* START: Critical section */
     shmem_plan_open = 1;
-    shmem_plan->target_pos += 0.01f;
-    shmem_plan->target_speed += 0.01f;
+    shmem_plan->target_pos = target_pos;
+    shmem_plan->target_speed = target_speed;
     shmem_plan->frame_id += 1;
     /* END: Critical section */
     if (sem_post(shmem_sem_plan) == -1)
