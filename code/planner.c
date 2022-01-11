@@ -286,6 +286,34 @@ int plnr_init()
 void calculate_next_position(const uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
     *target_pos = 0.0f; 
     *target_speed = 0.0f;
+
+    point2_t const center_track = track_center_black(pixels, 210);
+    const point2_t start_close = {center_track.x, 200};
+    const point2_t start_far = {center_track.x, 140};
+
+    uint16_t straight = raycast(pixels, start_close, (vec2_t){0,-1}, &cb_draw_light_stop_white);
+    uint16_t rays_left[6], rays_right[6];
+
+    /* TODO: Make function */
+    rays_left[0] = raycast(pixels, start_far, (vec2_t){2,-1}, &cb_draw_light_stop_white);
+    rays_left[1] = raycast(pixels, start_far, (vec2_t){3,-1}, &cb_draw_light_stop_white);
+    rays_left[2] = raycast(pixels, start_far, (vec2_t){1, 0}, &cb_draw_light_stop_white);
+    rays_left[3] = raycast(pixels, start_far, (vec2_t){6, 1}, &cb_draw_light_stop_white);
+    rays_left[4] = raycast(pixels, start_far, (vec2_t){5, -1}, &cb_draw_light_stop_white);
+    rays_left[5] = raycast(pixels, start_far, (vec2_t){12, 1}, &cb_draw_light_stop_white);
+
+    rays_right[0] = raycast(pixels, start_far, (vec2_t){-2,-1}, &cb_draw_light_stop_white);
+    rays_right[1] = raycast(pixels, start_far, (vec2_t){-3,-1}, &cb_draw_light_stop_white);
+    rays_right[2] = raycast(pixels, start_far, (vec2_t){-1, 0}, &cb_draw_light_stop_white);
+    rays_right[3] = raycast(pixels, start_far, (vec2_t){-6, 1}, &cb_draw_light_stop_white);
+    rays_right[4] = raycast(pixels, start_far, (vec2_t){-5, -1}, &cb_draw_light_stop_white);
+    rays_right[5] = raycast(pixels, start_far, (vec2_t){-12, 1}, &cb_draw_light_stop_white);
+
+    /* TODO: Make sumation function */
+    *target_pos = (rays_left[0] + rays_left[1] + rays_left[2] + rays_left[3] + rays_left[4] + rays_left[5]) - (rays_right[0] + rays_right[1] + rays_right[2] + rays_right[3] + rays_right[4] + rays_right[5]);
+    *target_pos /= 400; /* Normalize the sums */
+
+    *target_speed = (straight) / 250.0f; /* Speed is determined by distance to edge of track */
 }
 
 
