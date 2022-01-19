@@ -72,7 +72,7 @@ point2_t radial_sweep(
 
     buf_circ_t circ_buf = {(void *)circ_data, circ_size, circ_size - 1, sizeof(vec2_t)};
     uint16_t circ_idx = radial_start * circ_size;
-    // draw_q_square((point2_t){start.x + circ_data[circ_idx].x, start.y + circ_data[circ_idx].y}, 4, 150);
+    draw_q_square((point2_t){start.x + circ_data[circ_idx].x, start.y + circ_data[circ_idx].y}, 4, 150);
     point2_t trace_last = start;
 
     for (uint16_t contour_length_now = 0; contour_length_now < contour_length; contour_length_now++)
@@ -99,7 +99,7 @@ point2_t radial_sweep(
                 }
                 return trace_last;
             }
-            // draw_q_pixel(trace_target, 120);
+            draw_q_pixel(trace_target, 120);
 
             /* End current sweep when a white point is found and move onto the next one. */
             if ((*pixels)[trace_target.y][trace_target.x] > 0)
@@ -160,6 +160,10 @@ uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
 
 uint8_t cb_draw_light_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
+    if (!draw_enabled)
+    {
+        return 0;
+    }
     if ((*pixels)[point.y][point.x] != 255)
     {
         draw_q_pixel(point, 120);
@@ -170,18 +174,30 @@ uint8_t cb_draw_light_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_F
 
 uint8_t cb_draw_light_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
+    if (!draw_enabled)
+    {
+        return 0;
+    }
     draw_q_pixel(point, 120);
     return 0;
 }
 
 uint8_t cb_draw_perm_stop_no(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
+    if (!draw_enabled)
+    {
+        return 0;
+    }
     (*pixels)[point.y][point.x] = 255;
     return 0;
 }
 
 uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
+    if (!draw_enabled)
+    {
+        return 0;
+    }
     if ((*pixels)[point.y][point.x] != 255)
     {
         return 0;
