@@ -5,7 +5,7 @@
 #include "tco_shmem.h"
 #include "tco_linalg.h"
 
-extern const int draw_enabled;
+extern int draw_enabled;
 
 /**
  * @brief Draws all queued shapes on a given frame.
