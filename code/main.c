@@ -12,7 +12,7 @@
 #include "draw.h"
 
 const int log_level = LOG_INFO | LOG_ERROR | LOG_DEBUG;
-const int draw_enabled = 1;
+int draw_enabled = 1;
 
 void usage()
 {
@@ -58,7 +58,8 @@ int main(int argc, char *argv[])
   }
   else if (argc == 2 && (strcmp(argv[1], "--camera") == 0 || strcmp(argv[1], "-c") == 0))
   {
-    return pl_mgr_run(0, 1, NULL, NULL, NULL);
+    draw_enabled = 0; /* Avoid Clock Cycles wasted to draw when camera is running */
+    return pl_mgr_run(0, 1, &user_proc_func, NULL, &user_deinit);
   }
   else
   {

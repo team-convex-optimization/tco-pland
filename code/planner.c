@@ -283,14 +283,13 @@ int plnr_init()
  * @param target_speed is the speed to go at (m/s). NOTE This unit can easily be changed
  * @return void. values are passed through @p target_pos and @p target_speed pointers. 
  */
-void calculate_next_position(const uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
+void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
     *target_pos = 0.0f; 
     *target_speed = 0.0f;
 
     point2_t const center_track = track_center_black(pixels, 210);
     const point2_t start_close = {center_track.x, 200};
     const point2_t start_far = {center_track.x, 140};
-
     uint16_t straight = raycast(pixels, start_close, (vec2_t){0,-1}, &cb_draw_light_stop_white);
     uint16_t rays_left[6], rays_right[6];
 

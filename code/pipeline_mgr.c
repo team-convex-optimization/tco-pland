@@ -431,7 +431,7 @@ static int run_pl_camera()
         log_error("Failed to create a thread for writing camera frames to shmem");
         return EXIT_FAILURE;
     }
-    detect_and_handle_exit_requested(NULL);
+    // detect_and_handle_exit_requested(NULL); /* Not needed when process is also running */
     return EXIT_SUCCESS;
 }
 
@@ -493,12 +493,8 @@ static int run_pl_proc(void (*const proc_func)(uint8_t (*const)[TCO_FRAME_HEIGHT
 
 int pl_mgr_run(uint8_t const win_debug, uint8_t const cam_or_proc, void (*const proc_func)(uint8_t (*const)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], int const, void *const), void *const proc_func_args, int (*const user_deinit)(void))
 {
-    if (cam_or_proc)
-    {
-        return run_pl_camera();
+    if (cam_or_proc) {
+        run_pl_camera();
     }
-    else
-    {
-        return run_pl_proc(proc_func, proc_func_args, user_deinit, win_debug);
-    }
+    return run_pl_proc(proc_func, proc_func_args, user_deinit, win_debug);
 }
