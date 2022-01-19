@@ -85,17 +85,17 @@ static void cleanup(int (*user_deinit)(void))
         }
     }
 
-    if (thread_display != NULL && pthread_cancel(thread_display) != 0)
+    if (thread_display != 0 && pthread_cancel(thread_display) != 0)
     {
         log_error("Failed to cancel display thread");
     }
 
-    if (thread_proc != NULL &&  pthread_cancel(thread_proc) != 0)
+    if (thread_proc != 0 &&  pthread_cancel(thread_proc) != 0)
     {
         log_error("Failed to cancel proc thread");
     }
 
-    if (thread_camera != NULL && pthread_cancel(thread_camera) != 0)
+    if (thread_camera != 0 && pthread_cancel(thread_camera) != 0)
     {
         log_error("Failed to cancel camera thread");
     }
