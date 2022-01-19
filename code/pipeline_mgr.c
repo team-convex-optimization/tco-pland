@@ -218,7 +218,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
         memset(&compute_user_data->frame_end_times[0], 0, sizeof(struct timespec));
         memset(&compute_user_data->frame_end_times[1], 0, sizeof(struct timespec));
         fps_counter = 0;
-        log_info("fps: %u", fps_now);
+        // log_info("fps: %u", fps_now);
     }
     else
     {
