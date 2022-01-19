@@ -2,7 +2,6 @@
 #include <string.h>
 
 #include <gst/gst.h>
-
 #include "tco_libd.h"
 #include "tco_shmem.h"
 #include "pipeline.h"
@@ -68,6 +67,10 @@ static void log_gst_version(void)
  */
 static gboolean push_data(gst_pipeline_t *pipeline_info)
 {
+    if (!pipeline_info->user_data)
+    {
+        return FALSE;
+    }
     GstBuffer *buffer; /* Buffer for storing the frame data. */
     GstFlowReturn ret;
     GstMapInfo map; /* For storing information about a memory map. */

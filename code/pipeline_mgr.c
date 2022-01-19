@@ -34,7 +34,7 @@ static uint32_t const frame_size_expected = TCO_FRAME_WIDTH * TCO_FRAME_HEIGHT *
 /* This will be accessed by multiple threads. The alignment is there to avoid problems when using
 memcpy with this address. */
 static uint8_t _Alignas(4) frame_processed[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH] = {{0}};
-static pthread_mutex_t frame_processed_mutex;
+static pthread_mutex_t frame_processed_mutex = {0};
 
 /* Thread control state */
 static pthread_t thread_display = {0};        /* Thread which runs the display pipeline. */
@@ -84,26 +84,32 @@ static void cleanup(int (*user_deinit)(void))
             log_error("Failed to close semaphore used to control access to state shmem");
         }
     }
-    if (pthread_cancel(thread_display) != 0)
+
+    if (thread_display != NULL && pthread_cancel(thread_display) != 0)
     {
         log_error("Failed to cancel display thread");
     }
-    if (pthread_cancel(thread_proc) != 0)
+
+    if (thread_proc != NULL &&  pthread_cancel(thread_proc) != 0)
     {
         log_error("Failed to cancel proc thread");
     }
-    if (pthread_cancel(thread_camera) != 0)
+
+    if (thread_camera != NULL && pthread_cancel(thread_camera) != 0)
     {
         log_error("Failed to cancel camera thread");
     }
+
     if (pthread_mutex_destroy(&frame_processed_mutex) != 0)
     {
         log_error("Failed to destroy mutex for accessing processed frame data");
     }
+
     if (user_deinit != NULL && user_deinit() != 0)
     {
         log_error("User defined deinit function failed");
     }
+
 }
 
 /**
@@ -218,7 +224,7 @@ static void frame_raw_processor(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WI
         memset(&compute_user_data->frame_end_times[0], 0, sizeof(struct timespec));
         memset(&compute_user_data->frame_end_times[1], 0, sizeof(struct timespec));
         fps_counter = 0;
-        log_info("fps: %u", fps_now);
+        // log_info("fps: %u", fps_now);
     }
     else
     {
@@ -411,10 +417,8 @@ static void *thread_job_camera_pipeline(void *args)
  */
 static int run_pl_camera()
 {
-    register_signal_handler();
-
-    atomic_init(&exit_requested, 0);
-
+    /* Note that here we do not register signal handler nor atomic bool for exit 
+    request as this is a child thread meant to run alongside the plnr */
     if (shmem_map(TCO_SHMEM_NAME_STATE,
                   TCO_SHMEM_SIZE_STATE,
                   TCO_SHMEM_NAME_SEM_STATE,
@@ -431,7 +435,7 @@ static int run_pl_camera()
         log_error("Failed to create a thread for writing camera frames to shmem");
         return EXIT_FAILURE;
     }
-    // detect_and_handle_exit_requested(NULL); /* Not needed when process is also running */
+
     return EXIT_SUCCESS;
 }
 
