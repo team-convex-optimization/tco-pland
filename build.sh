@@ -25,7 +25,8 @@ clang \
     -I /usr/lib/aarch64-linux-gnu/glib-2.0/include \
 	-I /usr/include/gstreamer-1.0 \
 	-I /usr/include/glib-2.0 \
-    -l m\
+    -l m \
+    -O3 \
     -l rt \
     -l gstreamer-1.0 \
     -l glib-2.0 \
