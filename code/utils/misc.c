@@ -160,11 +160,6 @@ uint16_t raycast(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
 
 uint8_t cb_draw_light_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t const point)
 {
-    if (!draw_enabled)
-    {
-        return 0;
-    }
-
     if ((*pixels)[point.y][point.x] != 255)
     {
         draw_q_pixel(point, 120);
