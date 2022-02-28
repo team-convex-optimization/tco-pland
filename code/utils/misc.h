@@ -107,9 +107,10 @@ uint8_t cb_draw_no_stop_white(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAM
  * @brief Find the track center in the provided frame.
  * @param pixels The frame where the center will be found. It needs to be a segmented frame.
  * @param bottomr_row_idx Defines the y index in the frame where the center should be found.
+ * @param old_center Position from where to start searching
  * @return Track center.
  */
-point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx);
+point2_t track_center(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], uint16_t const bottom_row_idx, uint16_t old_center);
 
 /**
  * @brief Find the track center in the provided frame which is above a black pixel.

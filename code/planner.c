@@ -277,6 +277,19 @@ int plnr_init()
     return EXIT_SUCCESS;
 }
 
+
+/**
+ * @brief apply sigmoid activation on @p x with curvature defined with @p sense
+ * @param x input
+ * @result A function that follow a sigmoid function
+ * @note LaTeX : `f\left(x\right)\:=\:\left(\frac{1}{1+e^{-sx}}-.5\right)\cdot 2`
+*/
+float sigmoid_acvitvation(float x) {
+	float e = 2.71828; /* Eulers Number */
+	float denom = 1 + powf(e, -1.2f * ((10 * x) - 5)); // Normalised to [0, 1] boundries
+	return (1 / denom);
+}
+
 /**
  * @brief Calculate the best position to be in according to the current *segmented* frame
  * @param pixels is passed as a ptr
@@ -295,19 +308,24 @@ void calculate_next_position( uint8_t (* pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WID
     uint16_t ray_right = raycast(pixels, center_track, (vec2_t){1,0}, &cb_draw_light_stop_white);
     uint16_t ray_left = raycast(pixels, center_track, (vec2_t){-1,0}, &cb_draw_light_stop_white);
 
-    if ((ray_right > threshold) && (ray_left > threshold)) {
-        center_track = track_center(pixels, 80, old_center);
-    }
-
     old_center = center_track.x;
     draw_q_square(center_track, 8, 128);
 
-    uint16_t straight = raycast(pixels, start_close, (vec2_t){0,-1}, &cb_draw_light_stop_white);
+    if ((ray_right > threshold) && (ray_left > threshold)) {
+        center_track = track_center(pixels, 80, old_center);
+        old_center = TCO_FRAME_WIDTH / 2;
+    }
+
+    uint16_t straight = raycast(pixels, (point2_t) {TCO_FRAME_WIDTH / 2, 200}, (vec2_t){0,-1}, &cb_draw_light_stop_white);
 
     *target_pos = (center_track.x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
 
-    *target_speed = (straight) / 200.0f; /* Speed is determined by distance to edge of track */
-    draw_q_number(straight, (point2_t) {10, 10}, 3);
+    //if ((ray_right > threshold) && (ray_left > threshold)) {
+    //   *target_pos = 0.0f;
+    //    old_center = TCO_FRAME_WIDTH / 2;
+    //}
+    *target_speed = sigmoid_acvitvation((straight) / 200.0f); /* Speed is determined by distance to edge of track */
+    draw_q_number((int)((*target_speed)*100), (point2_t) {10, 10}, 3);
 }
 
 
