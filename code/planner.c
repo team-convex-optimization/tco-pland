@@ -287,7 +287,7 @@ void calculate_next_position( uint8_t (* pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WID
     *target_pos = 0.0f; 
     *target_speed = 0.0f;
 
-    point2_t const center_track = track_center_black(pixels, 210);
+    point2_t const center_track = (point2_t){TCO_FRAME_WIDTH/2, 210}; //track_center(pixels, 200);
     const point2_t start_close = {center_track.x, 200};
 
     uint16_t straight = raycast(pixels, start_close, (vec2_t){0,-1}, &cb_draw_light_stop_white);
