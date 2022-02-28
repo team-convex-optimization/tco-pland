@@ -16,10 +16,6 @@
 #include "misc.h"
 #include "buf_circ.h"
 
-#define Y_POS       200
-#define LINE_OFFSET 50
-#define THRESHOLD   240
-
 static struct tco_shmem_data_state *shmem_state;
 static sem_t *shmem_sem_state;
 static struct tco_shmem_data_plan *shmem_plan;
@@ -28,6 +24,7 @@ static uint8_t shmem_state_open = 0;
 static uint8_t shmem_plan_open = 0;
 
 static uint16_t const track_width = 300; /* Pixels */
+static uint16_t old_center = TCO_FRAME_WIDTH / 2;
 
 /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
 /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
@@ -288,49 +285,29 @@ int plnr_init()
  * @return void. values are passed through @p target_pos and @p target_speed pointers. 
  */
 void calculate_next_position( uint8_t (* pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
-    int BlackLineRight, BlackLineLeft; 
-    int RoadMiddle = 0, diff_new = 0, diff_old = 0;
-    const int half_frame = TCO_FRAME_WIDTH / 2;
-    
-    *target_pos = 0.0f;
+    *target_pos = 0.0f; 
     *target_speed = 0.0f;
+    const uint16_t threshold = (TCO_FRAME_WIDTH / 2) - 30;
 
-    BlackLineRight = TCO_FRAME_WIDTH;
-    for(int i = half_frame; i < TCO_FRAME_WIDTH; i++) {
-        if ((*pixels)[Y_POS][i] > THRESHOLD) {
-            BlackLineRight = i;
-            break;
-        }
-    }
-        
-    BlackLineLeft = 0;
-    for(int i = half_frame; i > 0; i--) {
-        if ((*pixels)[Y_POS][i] > THRESHOLD) {
-            BlackLineLeft = i;
-            break;
-        }
-    }
-        
-    RoadMiddle = (BlackLineLeft + BlackLineRight) / 2;
+    point2_t center_track = track_center(pixels, 180, old_center);
+    const point2_t start_close = {center_track.x, 200};
 
-    // If a line is only on the the left side
-    if (BlackLineRight > (TCO_FRAME_WIDTH - LINE_OFFSET)) {
-        RoadMiddle = BlackLineLeft + 180;
-    }
-    // If a line is only on the the right side
-    if (BlackLineLeft < 50) {
-        RoadMiddle = BlackLineRight - 180;
-    }
-    // If no line on left and right side
-    if ((BlackLineRight > (TCO_FRAME_WIDTH - LINE_OFFSET)) && (BlackLineLeft < 50)) {
-        RoadMiddle = half_frame;
-    }
-        
-    diff_old = diff_new;
-    diff_new = RoadMiddle - half_frame;
+    uint16_t ray_right = raycast(pixels, center_track, (vec2_t){1,0}, &cb_draw_light_stop_white);
+    uint16_t ray_left = raycast(pixels, center_track, (vec2_t){-1,0}, &cb_draw_light_stop_white);
 
-    *target_pos = (diff_new / (float) 120);
-    *target_speed = 0.3f; /* Speed is determined by distance to edge of track */
+    if ((ray_right > threshold) && (ray_left > threshold)) {
+        center_track = track_center(pixels, 80, old_center);
+    }
+
+    old_center = center_track.x;
+    draw_q_square(center_track, 8, 128);
+
+    uint16_t straight = raycast(pixels, start_close, (vec2_t){0,-1}, &cb_draw_light_stop_white);
+
+    *target_pos = (center_track.x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
+
+    *target_speed = (straight) / 200.0f; /* Speed is determined by distance to edge of track */
+    draw_q_number(straight, (point2_t) {10, 10}, 3);
 }
 
 
