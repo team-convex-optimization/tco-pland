@@ -24,7 +24,8 @@ static uint8_t shmem_state_open = 0;
 static uint8_t shmem_plan_open = 0;
 
 static uint16_t const track_width = 300; /* Pixels */
-static uint16_t old_center = TCO_FRAME_WIDTH / 2;
+static uint16_t prev_i = 0;
+static point2_t centers[10] = {(point2_t) {(TCO_FRAME_WIDTH / 2), 180}};
 
 /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
 /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
@@ -290,6 +291,10 @@ float sigmoid_acvitvation(float x) {
 	return (1 / denom);
 }
 
+int min(int a, int b) {
+    return a > b ? b : a;
+}
+
 /**
  * @brief Calculate the best position to be in according to the current *segmented* frame
  * @param pixels is passed as a ptr
@@ -297,33 +302,42 @@ float sigmoid_acvitvation(float x) {
  * @param target_speed is the speed to go at (m/s). NOTE This unit can easily be changed
  * @return void. values are passed through @p target_pos and @p target_speed pointers. 
  */
-void calculate_next_position( uint8_t (* pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
+void calculate_next_position(uint8_t (* pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
     *target_pos = 0.0f; 
     *target_speed = 0.0f;
-    const uint16_t threshold = (TCO_FRAME_WIDTH / 2) - 30;
-
-    point2_t center_track = track_center(pixels, 180, old_center);
-    const point2_t start_close = {center_track.x, 200};
-
-    uint16_t ray_right = raycast(pixels, center_track, (vec2_t){1,0}, &cb_draw_light_stop_white);
-    uint16_t ray_left = raycast(pixels, center_track, (vec2_t){-1,0}, &cb_draw_light_stop_white);
-
-    old_center = center_track.x;
-    draw_q_square(center_track, 8, 128);
-
-    if ((ray_right > threshold) && (ray_left > threshold)) {
-        center_track = track_center(pixels, 80, old_center);
-        old_center = TCO_FRAME_WIDTH / 2;
-    }
+    uint16_t height = 180, i = 0, sum_x = 0, avg_x, sum_of_rays = 0;
+    point2_t center_track;
 
     uint16_t straight = raycast(pixels, (point2_t) {TCO_FRAME_WIDTH / 2, 200}, (vec2_t){0,-1}, &cb_draw_light_stop_white);
 
-    *target_pos = (center_track.x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
+    for (height = 180, i = 0; height > 40 && (height > (200 - straight)); height -= 10, i++) {
+        center_track = centers[i] = i < prev_i && i != 0 ? track_center(pixels, height, centers[i - 1].x) : track_center(pixels, height, centers[0].x);
+        center_track = sum_of_rays > 3000 ? track_center(pixels, min(height / 5, 220 - straight), TCO_FRAME_WIDTH / 2) : center_track;
 
-    //if ((ray_right > threshold) && (ray_left > threshold)) {
-    //   *target_pos = 0.0f;
-    //    old_center = TCO_FRAME_WIDTH / 2;
-    //}
+        uint16_t ray_right = raycast(pixels, center_track, (vec2_t) {1, 0}, &cb_draw_light_stop_white);
+        uint16_t ray_left = raycast(pixels, center_track, (vec2_t) {-1, 0}, &cb_draw_light_stop_white);
+    
+        point2_t left_line = {center_track.x - ray_left, height};
+        point2_t right_line = {center_track.x + ray_right, height};
+
+        draw_q_square(left_line, 8, 128);
+        draw_q_square(right_line, 8, 128);
+        draw_q_square(center_track, 8, 128);
+
+        sum_x += center_track.x;
+        sum_of_rays += i < 6 ? ray_left + ray_right : 0;
+    }
+    
+    prev_i = i;
+    
+    avg_x = i > 0 ? sum_x / i : track_center(pixels, height, centers[0].x).x;
+    printf("%d\n", sum_of_rays);
+    center_track.x = avg_x;
+    center_track.y = 200;
+
+    draw_q_square(center_track, 10, 128);
+
+    *target_pos = (avg_x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
     *target_speed = sigmoid_acvitvation((straight) / 200.0f); /* Speed is determined by distance to edge of track */
     draw_q_number((int)((*target_speed)*100), (point2_t) {10, 10}, 3);
 }
