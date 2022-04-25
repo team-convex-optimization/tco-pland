@@ -26,8 +26,8 @@ static uint16_t const frame_bot = 210; /* Where the usable frame ends in the y d
  */
 static void algo_segment(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
-    uint8_t const delta_threshold = 20;
-    uint8_t const look_ahead_length = 6;
+    uint8_t const delta_threshold = 30;
+    uint8_t const look_ahead_length = 10;
     for (uint16_t height_idx = 0; height_idx < TCO_FRAME_HEIGHT; height_idx++)
     {
         for (uint16_t width_idx = 0; width_idx < TCO_FRAME_WIDTH; width_idx++)
@@ -154,8 +154,9 @@ static void span_fill(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]
 
 void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
 {
-    uint8_t const color_floor = 120; /* 0 - 255 */
-    uint8_t const border_size = 6;
+    uint8_t const color_floor = (*pixels)[180][TCO_FRAME_WIDTH / 2]; /* 0 - 255 */
+    uint8_t const border_size = 10;
+
     for (uint16_t y = 0; y < TCO_FRAME_HEIGHT; y++)
     {
         uint8_t const color_floor_adaptive = color_floor - ((y / (float)TCO_FRAME_HEIGHT) * color_floor);
@@ -170,8 +171,7 @@ void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
         }
     }
     algo_segment(pixels);
+    morph_primitive(pixels, 0, 1); /* Erode 3x3 */
     morph_primitive(pixels, 1, 0); /* Dilate 5x5 */
-    morph_primitive(pixels, 0, 0); /* Erode 5x5 */
-    point2_t const center_black = track_center_black(pixels, frame_bot);
-    span_fill(pixels, center_black);
+    morph_primitive(pixels, 0, 1); /* Erode 3x3 */
 }
