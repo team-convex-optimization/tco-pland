@@ -330,11 +330,20 @@ float sigmoid_straight(float x) {
  * @param pixels is passed as a ptr
  * @return int > 0 if there is a finish
  */
-int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t dir, uint16_t parallel_dir_length, uint16_t left_diagonal, uint16_t right_diagonal) {
-    static const uint8_t max_ray_length = 140;
-    static const uint8_t min_ray_length = 90;
+int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
+    point2_t dir,
+    uint16_t parallel_dir_length,
+    uint16_t left_diagonal,
+    uint16_t right_diagonal,
+    uint16_t left_horizontal,
+    uint16_t right_horizontal) {
 
-    return ((left_diagonal + right_diagonal) < min_ray_length) && (parallel_dir_length > max_ray_length);
+    static const uint8_t max_ray_length = 120;
+    static const uint8_t max_length_hor = 80;
+    return (((left_diagonal + right_diagonal) > max_ray_length) && 
+            ((left_horizontal + right_horizontal) < max_length_hor) &&
+            (parallel_dir_length > max_ray_length)) ||
+            (((left_diagonal + right_diagonal) < 90) && ((left_diagonal < 40) || (right_diagonal < 40)) && (parallel_dir_length > max_ray_length));
 }
 
 /**
@@ -356,11 +365,11 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     point2_t base;
 
     point2_t center_track = base = track_center(pixels, height, prev_avg);
-    printf("%d\n", center_track.x);
     uint16_t straight = speed = raycast(pixels, (point2_t) {center_track.x, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white); 
     uint16_t left_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {-1,-1}, &cb_draw_light_stop_white);
     uint16_t right_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {1,-1}, &cb_draw_light_stop_white);
-    
+    uint16_t left_horizontal =  raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {-1,0}, &cb_draw_light_stop_white);  
+    uint16_t right_horizontal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {1,0}, &cb_draw_light_stop_white);
     add_speed_to_results(speed);
 
     for (height = HEIGHT, i = 0; (height > step) && (straight > (height_limit * step)) && i < MAX_CENTERS; height -= step, i++) {
@@ -403,7 +412,7 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
 
     uint16_t parallel_dir_length = raycast(pixels, base, parallel_dir, &cb_draw_no_stop_white);
 
-    if (finish_condition(pixels, center_track, parallel_dir_length, left_diagonal, right_diagonal)) is_finished = 0;
+    if (finish_condition(pixels, center_track, parallel_dir_length, left_diagonal, right_diagonal, left_horizontal, right_horizontal)) is_finished = 1;
     if (is_finished) draw_q_number(1, (point2_t) {10,40}, 4);
     else draw_q_number(0, (point2_t) {10,40}, 4);
 
