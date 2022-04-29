@@ -298,6 +298,11 @@ float sigmoid_acvitvation(float x) {
 	return (1 / denom);
 }
 
+
+float limit_speed(float speed, float limit) {
+    return speed > limit ? limit : speed;
+}
+
 /**
  * @brief Check if the car is facing a finish line. Only call when there is a possible finish line detected
  * If the top and down raycasts are of similar length and the middle raycast is twice as long, then there is a finish line.
@@ -328,13 +333,10 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
 
     point2_t center_track = base = track_center(pixels, height, prev_avg);
     uint16_t straight = speed = raycast(pixels, (point2_t) {center_track.x, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
-// && (height > DEFAULT_HEIGHT - speed)
+    
     for (height = HEIGHT, i = 0; (height > step) && (straight > (1.5 * step)) && i < MAX_CENTERS; height -= step, i++) {
         straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white) : straight;
         center_track = centers[i] = i != 0 ? track_center(pixels, height, centers[i - 1].x) : track_center(pixels, height, centers[0].x);
-        // if (i > 0 && (abs(centers[i].x - centers[i - 1].x) > RAY_LENGTH / 4)) {
-        //     break;
-        // }
 
         uint16_t ray_right = raycast(pixels, center_track, (vec2_t) {1, 0}, &cb_draw_no_stop_white);
         uint16_t ray_left = raycast(pixels, center_track, (vec2_t) {-1, 0}, &cb_draw_no_stop_white);
@@ -356,8 +358,6 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     parallel = raycast(pixels, base, parallel_dir, &cb_draw_light_stop_white);
     uint16_t avg_spd = is_finished > 0 ? 50 : (parallel + speed) / 2;
 
-    // printf("%d %d\n", avg_rays, sum_of_rays);
-
     if (avg_rays > 500 && sum_of_rays > intersection_threshold) {
         uint16_t l = raycast(pixels, (point2_t) {avg_x - 20, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
         uint16_t r = raycast(pixels, (point2_t) {avg_x + 20, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
@@ -373,7 +373,7 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     draw_q_square(center_track, 12, 128);
 
     *target_pos = (avg_x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
-    *target_speed = sigmoid_acvitvation((avg_spd) / 200.0f); /* Speed is determined by distance to edge of track */
+    *target_speed = limit(sigmoid_acvitvation((avg_spd) / 200.0f), 0.65f); /* Speed is determined by distance to edge of track */
     draw_q_number(avg_spd, (point2_t) {10, 10}, 4);
 }
 

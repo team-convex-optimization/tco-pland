@@ -23,7 +23,7 @@ static const gchar *pipeline_camera_def =
     "video/x-raw,format=YUY2,width=640,height=480,framerate=30/1 !"
     "videocrop top=0 left=0 right=0 bottom=200 !"
     "queue max-size-buffers=1 leaky=downstream !"
-    "videoconvert n-threads=2 !"
+    "videoconvert n-threads=4 !"
     "appsink name=appsink caps=video/x-raw,format=GRAY8,width=640,height=280";
 
 static const gchar *pipeline_camera_sim_def =
@@ -34,7 +34,7 @@ static const gchar *pipeline_camera_sim_def =
 static const gchar *pipeline_display_def =
     "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=280 !"
     "videoconvert !"
-    "autovideosink";
+    "ximagesink";
 
 /**
  * @brief Print out the version of the GStreamer linked with the app.
