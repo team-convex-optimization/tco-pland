@@ -19,6 +19,7 @@
 #define HEIGHT ( 180 )
 #define DEFAULT_HEIGHT ( HEIGHT + 10 )
 #define RAY_LENGTH ( TCO_FRAME_WIDTH - 30 )
+#define MAX_CENTERS ( 128 ) /* The maximum number of centers in the the driving algorithm */
 
 static struct tco_shmem_data_state *shmem_state;
 static sem_t *shmem_sem_state;
@@ -29,7 +30,7 @@ static uint8_t shmem_plan_open = 0;
 
 static uint16_t const track_width = 300; /* Pixels */
 static uint16_t prev_i = 0, prev_avg = (TCO_FRAME_WIDTH / 2);
-static point2_t centers[10] = {(point2_t) {(TCO_FRAME_WIDTH / 2), 180}};
+static point2_t centers[MAX_CENTERS] = {(point2_t) {(TCO_FRAME_WIDTH / 2), 180}}; 
 
 /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
 /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
@@ -310,13 +311,13 @@ void calculate_next_position(uint8_t (* pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDT
     *target_pos = 0.0f; 
     *target_speed = 0.0f;
     uint16_t height = HEIGHT, i = 0, sum_x = 0, avg_x, sum_of_rays = 0, speed, longest_i = 0, longest_straight = 0;
-    static const uint16_t step = 10;
+    static const uint16_t step = 5;
     static const uint16_t intersection_threshold = 4500;
 
     point2_t center_track = track_center(pixels, height, prev_avg);
     uint16_t straight = speed = raycast(pixels, (point2_t) {center_track.x, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
 
-    for (height = HEIGHT, i = 0; (height > 20) && (straight > (1.5 * step)) && (height > DEFAULT_HEIGHT - speed); height -= step, i++) {
+    for (height = HEIGHT, i = 0; (height > 20) && (straight > (1.5 * step)) && (height > DEFAULT_HEIGHT - speed) && i < MAX_CENTERS; height -= step, i++) {
         straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_light_stop_white) : straight;
         // Misschien veranderen naar hoogste y ipv langste straal
         if (straight > longest_straight) {
