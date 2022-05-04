@@ -32,6 +32,7 @@ static uint16_t const track_width = 300; /* Pixels */
 static uint16_t prev_i = 0, prev_avg = (TCO_FRAME_WIDTH / 2);
 static point2_t centers[MAX_CENTERS] = {(point2_t) {(TCO_FRAME_WIDTH / 2), 180}};
 static uint8_t is_finished = 0;
+static uint16_t parallel = 100;
 
 /* Generated with "tco_circle_vector_gen" for a radius 6 circle. */
 /* Up -> Q1 -> Right -> Q4 -> Down -> Q3 -> Left -> Q2 -> (wrap-around to Up) */
@@ -304,14 +305,10 @@ float sigmoid_acvitvation(float x) {
  * @return int > 0 if there is a finish
  */
 int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]) {
-    uint16_t l_d = raycast(pixels, (point2_t) {prev_avg - 40, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
-    uint16_t r_d = raycast(pixels, (point2_t) {prev_avg + 40, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
-    uint16_t l_t = raycast(pixels, (point2_t) {prev_avg - 40, 0}, (vec2_t) {0,1}, &cb_draw_light_stop_white);
-    uint16_t r_t = raycast(pixels, (point2_t) {prev_avg + 40, 0}, (vec2_t) {0,1}, &cb_draw_light_stop_white);
+    uint16_t left_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {-2,-3}, &cb_draw_light_stop_white);
+    uint16_t right_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {2,-3}, &cb_draw_light_stop_white);
 
-    uint16_t m = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
-
-    return (((l_d + l_t) - (r_d + r_t) < 5) && l_d > 20 && r_d > 20 && (m > 2 * r_d) && (m > 2 * l_d));
+    return ((left_diagonal + right_diagonal) < 90) && (parallel > 150);
 }
 
 /**
@@ -325,7 +322,7 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     *target_pos = 0.0f; 
     *target_speed = 0.0f;
     uint16_t speed, height = HEIGHT, i = 0, sum_x = 0, avg_x = prev_avg, sum_of_rays = 0;
-    static const uint16_t step = 8;
+    static const uint16_t step = 4;
     static const uint16_t intersection_threshold = 10000;
     point2_t base;
 
@@ -333,7 +330,7 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     uint16_t straight = speed = raycast(pixels, (point2_t) {center_track.x, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
 // && (height > DEFAULT_HEIGHT - speed)
     for (height = HEIGHT, i = 0; (height > step) && (straight > (1.5 * step)) && i < MAX_CENTERS; height -= step, i++) {
-        straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_light_stop_white) : straight;
+        straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white) : straight;
         center_track = centers[i] = i != 0 ? track_center(pixels, height, centers[i - 1].x) : track_center(pixels, height, centers[0].x);
         // if (i > 0 && (abs(centers[i].x - centers[i - 1].x) > RAY_LENGTH / 4)) {
         //     break;
@@ -342,11 +339,11 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
         uint16_t ray_right = raycast(pixels, center_track, (vec2_t) {1, 0}, &cb_draw_no_stop_white);
         uint16_t ray_left = raycast(pixels, center_track, (vec2_t) {-1, 0}, &cb_draw_no_stop_white);
 
-        if (ray_left + ray_right < 50 && finish_condition(pixels)) {
+        if (finish_condition(pixels)) {
             is_finished = 1;
         }
 
-        draw_q_square(center_track, 6, 128);
+        draw_q_square(center_track, 4, 128);
 
         sum_x += center_track.x;
         sum_of_rays += ray_left + ray_right;
@@ -355,9 +352,9 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     prev_i = (abs(i - prev_i) < 4) ? i : prev_i;
     uint16_t avg_rays =  i > 0 ? sum_of_rays / i : sum_of_rays;
 
-    vec2_t parallel = { center_track.x - base.x, center_track.y - base.y };
-    uint16_t result = raycast(pixels, base, parallel, &cb_draw_light_stop_white);
-    uint16_t avg_spd = is_finished > 0 ? 50 : (result + speed) / 2;
+    vec2_t parallel_dir = { center_track.x - base.x, center_track.y - base.y };
+    parallel = raycast(pixels, base, parallel_dir, &cb_draw_light_stop_white);
+    uint16_t avg_spd = is_finished > 0 ? 50 : (parallel + speed) / 2;
 
     // printf("%d %d\n", avg_rays, sum_of_rays);
 
