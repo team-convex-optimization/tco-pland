@@ -287,15 +287,25 @@ int plnr_init()
 
 
 /**
- * @brief apply sigmoid activation on @p x with curvature defined with @p sense
- * @param x input
- * @result A function that follow a sigmoid function
- * @note LaTeX : `f\left(x\right)\:=\:\left(\frac{1}{1+e^{-sx}}-.5\right)\cdot 2`
+ * @brief Apply a simplified sigmoid on @param x for corners
+ * @param x A float between 0 and 1
+ * @return float
 */
-float sigmoid_acvitvation(float x) {
+float sigmoid_corner(float x) {
     if (x < 0.55f) return 0.05f;
     if (x < 0.95f) return (x - 0.4f) * 1.727f + 0.05f;
     return (x - 0.95f) * 2.0f + 0.9f;
+}
+
+/**
+ * @brief Apply a simplified sigmoid on @param x for straights
+ * @param x A float between 0 and 1
+ * @return float 
+ */
+float sigmoid_straight(float x) {
+    if (x < 0.55f) return 0.05f;
+    if (x < 0.70f) return (x - 0.15f) * 1.273f + 0.05f;
+    return (x - 0.70f) * 12.0f + 0.4f;
 }
 
 /**
@@ -321,7 +331,7 @@ int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH]) {
 void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], float *target_pos, float *target_speed) {
     *target_pos = 0.0f; 
     *target_speed = 0.0f;
-    uint16_t speed, height = HEIGHT, i = 0, sum_x = 0, avg_x = prev_avg, sum_of_rays = 0;
+    uint16_t speed, height = HEIGHT, i = 0, sum_x = 0, sum_y = 0, avg_x = prev_avg, sum_of_rays = 0;
     static const uint16_t step = 4;
     static const uint16_t intersection_threshold = 10000;
     point2_t base;
@@ -342,15 +352,14 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
         draw_q_square(center_track, 4, 128);
 
         sum_x += center_track.x;
+        sum_y += center_track.y;
         sum_of_rays += ray_left + ray_right;
     }
 
     prev_i = (abs(i - prev_i) < 4) ? i : prev_i;
     uint16_t avg_rays =  i > 0 ? sum_of_rays / i : sum_of_rays;
 
-    vec2_t parallel_dir = { center_track.x - base.x, center_track.y - base.y };
-    parallel = raycast(pixels, base, parallel_dir, &cb_draw_light_stop_white);
-    uint16_t avg_spd = is_finished > 0 ? 50 : (parallel + speed) / 2;
+    vec2_t parallel_extremes = { center_track.x - base.x, center_track.y - base.y };
 
     if (avg_rays > 500 && sum_of_rays > intersection_threshold) {
         uint16_t l = raycast(pixels, (point2_t) {avg_x - 20, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
@@ -361,14 +370,28 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     else center_track.x = avg_x = i > 0 ? sum_x / i : track_center(pixels, height, centers[0].x).x;
     center_track.y = DEFAULT_HEIGHT;
 
+    /* Take the gradient of all the centers (parallel_dir.y / parallel_dir.x) and the two extremes (parallel_extremes.y / parallel_extremes.x) */
+    /* Speed is determined by distance to edge of track */
+    vec2_t parallel_dir = { center_track.x - base.x, (i > 0 ? sum_y / i : HEIGHT - 10) - base.y };
+    if ((fabs(parallel_dir.y / (double) parallel_dir.x) < 2.0f) ||
+        (fabs(parallel_extremes.y / (double) parallel_extremes.x) < 2.0f)) {
+            *target_speed = sigmoid_corner(speed / ((float) DEFAULT_HEIGHT));
+            printf("Corner!\n");
+        }
+    else {
+        *target_speed = sigmoid_straight(speed / ((float) DEFAULT_HEIGHT));
+        printf("Straight!\n");
+    }
+    draw_q_number((int) ((*target_speed * 100.0f)), (point2_t) {10, 10}, 4);
+
+    uint16_t avg_spd = is_finished > 0 ? 50 : (parallel + speed) / 2;
+
     // TODO: good check
     prev_avg = (abs(avg_x - prev_avg) < (TCO_FRAME_WIDTH / 2)) ? avg_x : prev_avg;
 
     draw_q_square(center_track, 12, 128);
 
     *target_pos = (avg_x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
-    *target_speed = sigmoid_acvitvation(speed / ((float) DEFAULT_HEIGHT)); /* Speed is determined by distance to edge of track */
-    draw_q_number((int) ((*target_speed * 100.0f)), (point2_t) {10, 10}, 4);
 }
 
 
