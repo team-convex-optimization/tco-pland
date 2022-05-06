@@ -293,14 +293,9 @@ int plnr_init()
  * @note LaTeX : `f\left(x\right)\:=\:\left(\frac{1}{1+e^{-sx}}-.5\right)\cdot 2`
 */
 float sigmoid_acvitvation(float x) {
-	float e = 2.71828; /* Eulers Number */
-	float denom = 1 + powf(e, -1.2f * ((10 * x) - 5)); // Normalised to [0, 1] boundries
-	return (1 / denom);
-}
-
-
-float limit_speed(float speed, float limit) {
-    return speed > limit ? limit : speed;
+    if (x < 0.55f) return 0.05f;
+    if (x < 0.95f) return (x - 0.4f) * 1.727f + 0.05f;
+    return (x - 0.95f) * 2.0f + 0.9f;
 }
 
 /**
@@ -333,7 +328,6 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
 
     point2_t center_track = base = track_center(pixels, height, prev_avg);
     uint16_t straight = speed = raycast(pixels, (point2_t) {center_track.x, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
-    
     for (height = HEIGHT, i = 0; (height > step) && (straight > (1.5 * step)) && i < MAX_CENTERS; height -= step, i++) {
         straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white) : straight;
         center_track = centers[i] = i != 0 ? track_center(pixels, height, centers[i - 1].x) : track_center(pixels, height, centers[0].x);
@@ -373,8 +367,8 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     draw_q_square(center_track, 12, 128);
 
     *target_pos = (avg_x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
-    *target_speed = limit(sigmoid_acvitvation((avg_spd) / 200.0f), 0.65f); /* Speed is determined by distance to edge of track */
-    draw_q_number(avg_spd, (point2_t) {10, 10}, 4);
+    *target_speed = sigmoid_acvitvation(speed / ((float) DEFAULT_HEIGHT)); /* Speed is determined by distance to edge of track */
+    draw_q_number((int) ((*target_speed * 100.0f)), (point2_t) {10, 10}, 4);
 }
 
 
