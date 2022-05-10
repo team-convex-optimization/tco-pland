@@ -16,7 +16,7 @@
 #include "misc.h"
 #include "buf_circ.h"
 
-#define HEIGHT ( 180 )
+#define HEIGHT ( 160 )
 #define DEFAULT_HEIGHT ( HEIGHT + 10 )
 #define RAY_LENGTH ( TCO_FRAME_WIDTH - 30 )
 #define MAX_CENTERS ( 192 ) /* The maximum number of centers in the the driving algorithm */
@@ -308,9 +308,9 @@ uint16_t find_avg_speed() {
  * @return float
 */
 float sigmoid_corner(float x) {
-    if (x < 0.4f) return 0.2f;
-    if (x < 0.9f) return (x - 0.4f) * 0.2f + 0.2f;
-    return ((x - 0.9f) * 2.0f + 0.9f);
+    if (x < 0.3f) return 0.05f;
+    if (x < 0.95f) return (x - 0.3f) * 1.462f + 0.05f;
+    return 1.0f;
 }
 
 /**
@@ -330,11 +330,9 @@ float sigmoid_straight(float x) {
  * @param pixels is passed as a ptr
  * @return int > 0 if there is a finish
  */
-int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t dir, uint16_t parallel_dir_length) {
+int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t dir, uint16_t parallel_dir_length, uint16_t left_diagonal, uint16_t right_diagonal) {
     static const uint8_t max_ray_length = 140;
     static const uint8_t min_ray_length = 90;
-    uint16_t left_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {-1,-1}, &cb_draw_light_stop_white);
-    uint16_t right_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {1,-1}, &cb_draw_light_stop_white);
 
     return ((left_diagonal + right_diagonal) < min_ray_length) && (parallel_dir_length > max_ray_length);
 }
@@ -351,18 +349,32 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     *target_speed = 0.0f;
     uint16_t speed, height = HEIGHT, i = 0, sum_x = 0, sum_y = 0, avg_x = prev_avg;
     uint32_t sum_of_rays = 0;
-    static const uint16_t step = 4;
+    static const uint16_t step = 8;
     static const uint16_t intersection_avg = 450;
     static const uint16_t intersection_sum = 14000;
+    static const float height_limit = 1.5f;
     point2_t base;
 
     point2_t center_track = base = track_center(pixels, height, prev_avg);
+    printf("%d\n", center_track.x);
     uint16_t straight = speed = raycast(pixels, (point2_t) {center_track.x, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white); 
-
+    uint16_t left_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {-1,-1}, &cb_draw_light_stop_white);
+    uint16_t right_diagonal = raycast(pixels, (point2_t) {prev_avg, DEFAULT_HEIGHT}, (vec2_t) {1,-1}, &cb_draw_light_stop_white);
+    
     add_speed_to_results(speed);
 
-    for (height = HEIGHT, i = 0; (height > step) && (straight > (1.5 * step)) && i < MAX_CENTERS; height -= step, i++) {
+    for (height = HEIGHT, i = 0; (height > step) && (straight > (height_limit * step)) && i < MAX_CENTERS; height -= step, i++) {
         straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white) : straight;
+
+//        if (straight <= (height_limit * step)) {
+//            if (left_diagonal > (height_limit * right_diagonal)) {
+//                centers[i - 1].x -= (TCO_FRAME_WIDTH / 4);
+//           } else if (right_diagonal > (height_limit * left_diagonal)) {
+//                centers[i - 1].x += (TCO_FRAME_WIDTH / 4);
+//            }
+//            straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white) : straight;
+//        }
+
         center_track = centers[i] = i != 0 ? track_center(pixels, height, centers[i - 1].x) : track_center(pixels, height, centers[0].x);
 
         uint16_t ray_right = raycast(pixels, center_track, (vec2_t) {1, 0}, &cb_draw_no_stop_white);
@@ -382,38 +394,35 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     vec2_t parallel_extremes = { center_track.x - base.x, center_track.y - base.y };
     // raycast(pixels, base, parallel_extremes, &cb_draw_light_stop_white);
     // printf("%d %d\n", avg_rays, sum_of_rays);
-    if (avg_rays > intersection_avg && sum_of_rays > intersection_sum) {
-        uint16_t l = raycast(pixels, (point2_t) {avg_x - 30, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
-        uint16_t r = raycast(pixels, (point2_t) {avg_x + 30, DEFAULT_HEIGHT}, (vec2_t) {0,-1}, &cb_draw_light_stop_white);
-        center_track.x = avg_x = i > 0 ? sum_x / i : track_center(pixels, height, centers[0].x).x;
-        center_track.x = avg_x = l > r ? avg_x - 30 : avg_x + 30; // TODO: underflow
-    }
-    else center_track.x = avg_x = i > 0 ? sum_x / i : track_center(pixels, height, centers[0].x).x;
+    center_track.x = avg_x = i > 0 ? sum_x / i : track_center(pixels, height, centers[0].x).x;
     center_track.y = DEFAULT_HEIGHT;
 
     /* Take the gradient of all the centers (parallel_dir.y / parallel_dir.x) and the two extremes (parallel_extremes.y / parallel_extremes.x) */
     /* Speed is determined by distance to edge of track */
     vec2_t parallel_dir = { center_track.x - base.x, (i > 0 ? sum_y / i : HEIGHT - 10) - base.y };
+
     uint16_t parallel_dir_length = raycast(pixels, base, parallel_dir, &cb_draw_no_stop_white);
 
-    if (finish_condition(pixels, center_track, parallel_dir_length)) is_finished = 1;
+    if (finish_condition(pixels, center_track, parallel_dir_length, left_diagonal, right_diagonal)) is_finished = 0;
     if (is_finished) draw_q_number(1, (point2_t) {10,40}, 4);
+    else draw_q_number(0, (point2_t) {10,40}, 4);
 
-    if ((fabs(parallel_dir.y / (double) parallel_dir.x) < 4.0f) ||
-        (fabs(parallel_extremes.y / (double) parallel_extremes.x) < 2.0f)) {
+    if ((fabs(parallel_dir.y / (double) parallel_dir.x) < 5.0f) ||
+        (fabs(parallel_extremes.y / (double) parallel_extremes.x) < 5.0f)) {
            *target_speed = sigmoid_corner(find_avg_speed() / ((float) DEFAULT_HEIGHT));
         }
     else {
-        *target_speed = sigmoid_straight(find_avg_speed() / ((float) DEFAULT_HEIGHT));
+        *target_speed = sigmoid_corner(find_avg_speed() / ((float) DEFAULT_HEIGHT));
     }
     draw_q_number((int) ((*target_speed * 100.0f)), (point2_t) {10, 10}, 4);
-
+    
+    float average_steering = (prev_avg + avg_x) / 2.0f;
     // TODO: good check
-    prev_avg = (abs(avg_x - prev_avg) < (TCO_FRAME_WIDTH / 3)) ? avg_x : prev_avg;
+    prev_avg = avg_x;//(abs(avg_x - prev_avg) < (TCO_FRAME_WIDTH / 4)) ? avg_x : prev_avg;
 
     draw_q_square(center_track, 12, 128);
-
-    *target_pos = (avg_x - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
+    
+    *target_pos = (average_steering - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
 }
 
 
