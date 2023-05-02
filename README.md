@@ -11,6 +11,12 @@ state shmem and another for reading camera frames and writing them to state shme
 - ```display pipeline```: Displays a window which shows the processed frames. This is only used for
   testing and should never be run on the target.
 
+## 60 FPS
+The camera pipeline is set to 60fps. To enable this, please apply the driver patch supplied
+in `tco-utils/mendel_patches`. If for some reason, you do not want to apply this step, please
+change the camera format to something supported like : 
+`video/x-raw,format=YUY2,width=640,height=480,framerate=30/1 !`.
+
 ## Dependencies
 - libglib2.0-dev (also contains libgobject-2.0-dev)
 - libgstreamer1.0-dev
