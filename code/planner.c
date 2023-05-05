@@ -308,9 +308,8 @@ uint16_t find_avg_speed() {
  * @return float
 */
 float sigmoid_corner(float x) {
-    if (x < 0.3f) return 0.05f;
-    if (x < 0.95f) return (x - 0.3f) * 1.462f + 0.05f;
-    return 1.0f;
+    //if (x < 0.95f) return 0.05f;
+    return x;//(x - 0.3f) * 1.462f + 0.05f;
 }
 
 /**
@@ -346,7 +345,7 @@ int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
     static const uint8_t max_length_hor = 80;
     static const float min_rc = 4.0f;
     if (fabs(-dir.y / (float) dir.x) < min_rc || ((perp_length_r + perp_length_l) < 20 )) return 0;
-    printf("%f, %d %d %d\n", -dir.y / (float) dir.x,left_diagonal, right_diagonal, parallel_dir_length);
+    //printf("%f, %d %d %d\n", -dir.y / (float) dir.x,left_diagonal, right_diagonal, parallel_dir_length);
     return (((left_diagonal + right_diagonal) > max_ray_length) && 
             ((left_horizontal + right_horizontal) < max_length_hor) &&
             (parallel_dir_length > max_ray_length)) ||
@@ -423,13 +422,13 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     if (is_finished) draw_q_number(1, (point2_t) {10,40}, 4);
     else draw_q_number(0, (point2_t) {10,40}, 4);
 
-    if ((fabs(parallel_dir.y / (double) parallel_dir.x) < 5.0f) ||
-        (fabs(parallel_extremes.y / (double) parallel_extremes.x) < 5.0f)) {
-           *target_speed = sigmoid_corner(find_avg_speed() / ((float) DEFAULT_HEIGHT));
-        }
-    else {
-        *target_speed = sigmoid_corner(find_avg_speed() / ((float) DEFAULT_HEIGHT));
-    }
+    //if ((fabs(parallel_dir.y / (double) parallel_dir.x) < 5.0f) ||
+    //    (fabs(parallel_extremes.y / (double) parallel_extremes.x) < 5.0f)) {
+    //       *target_speed = sigmoid_corner(find_avg_speed() / ((float) DEFAULT_HEIGHT));
+    //    }
+    //else {
+    //    *target_speed = sigmoid_corner(find_avg_speed() / ((float) DEFAULT_HEIGHT));
+    //}
     draw_q_number((int) ((*target_speed * 100.0f)), (point2_t) {10, 10}, 4);
     
     float average_steering = (prev_avg + avg_x) / 2.0f;
@@ -439,6 +438,8 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     draw_q_square(center_track, 12, 128);
     
     *target_pos = (average_steering - (TCO_FRAME_WIDTH / 2.0f)) / (TCO_FRAME_WIDTH / 2.0f);
+    *target_pos = *target_pos * 4.0f;
+    *target_speed = sigmoid_corner(find_avg_speed() / ((float) DEFAULT_HEIGHT));
 }
 
 

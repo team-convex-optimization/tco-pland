@@ -283,7 +283,7 @@ static void frame_raw_injector(uint8_t (*pixel_dest)[TCO_FRAME_HEIGHT][TCO_FRAME
 
         /* 20ms but not exactly due to granularity of the clock hence the 'rem' pointer passed to
         'nanosleep' */
-        struct timespec const req = {0, 20000000};
+        struct timespec const req = {0, 10000000};
         struct timespec rem;
         nanosleep(&req, &rem);
     }

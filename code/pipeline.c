@@ -18,21 +18,24 @@ typedef struct gst_pipeline_t
 static gst_pipeline_t pipeline_main = {NULL, NULL, NULL};
 static gst_pipeline_t pipeline_display = {NULL, NULL, NULL};
 
+/**
+ * With a bottom=390 crop the aspect ratio is the same as with a 640x480 source, but with a framerate of ~45 FPS.
+**/
 static const gchar *pipeline_camera_def =
     "v4l2src device=/dev/video0 !"
     "video/x-raw,format=YUY2,width=640,height=480,framerate=30/1 !"
-    "videocrop top=0 left=0 right=0 bottom=240 !"
-    "queue max-size-buffers=1 leaky=downstream !"
+    "videocrop top=0 left=0 right=0 bottom=260 !" // 150 350
     "videoconvert n-threads=4 !"
-    "appsink name=appsink caps=video/x-raw,format=GRAY8,width=640,height=240";
+    "videoscale !"
+    "appsink name=appsink caps=video/x-raw,format=GRAY8,width=640,height=220";
 
 static const gchar *pipeline_camera_sim_def =
-    "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=240 !"
+    "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=220 !"
     "videoconvert !"
-    "appsink name=appsink caps=video/x-raw,format=GRAY8,width=640,height=240";
+    "appsink name=appsink caps=video/x-raw,format=GRAY8,width=640,height=220";
 
 static const gchar *pipeline_display_def =
-    "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=240 !"
+    "appsrc name=appsrc caps=video/x-raw,format=GRAY8,width=640,height=220 !"
     "videoconvert !"
     "ximagesink";
 
