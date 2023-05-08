@@ -329,27 +329,26 @@ float sigmoid_straight(float x) {
  * @param pixels is passed as a ptr
  * @return int > 0 if there is a finish
  */
-int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH],
-    point2_t center,
-    vec2_t dir,
-    uint16_t parallel_dir_length,
-    uint16_t left_diagonal,
-    uint16_t right_diagonal,
-    uint16_t left_horizontal,
-    uint16_t right_horizontal) {
+int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t center, vec2_t dir) {
+    static const float min_rc = 5.0f;
+    static const uint8_t persp_shift = 25;
+    static const uint8_t finish_length = 60;
+    
+    if (fabs(-dir.y / (float) dir.x) < min_rc) return 0;
+    uint16_t perp_length_r = raycast(pixels, center, (vec2_t) {-dir.y, dir.x}, &cb_draw_light_stop_white);  
+    uint16_t perp_length_l = raycast(pixels, center, (vec2_t) {dir.y, -dir.x}, &cb_draw_light_stop_white);   
+    
+    uint16_t ray_ll = raycast(pixels, (point2_t) {center.x - 80, center.y}, (vec2_t) {dir.x + persp_shift, dir.y}, &cb_draw_light_stop_white);
+    uint16_t ray_lc = raycast(pixels, (point2_t) {center.x - 60, center.y}, (vec2_t) {dir.x + persp_shift, dir.y}, &cb_draw_light_stop_white);
+    uint16_t ray_rc = raycast(pixels, (point2_t) {center.x + 60, center.y}, (vec2_t) {dir.x - persp_shift, dir.y}, &cb_draw_light_stop_white);
+    uint16_t ray_rr = raycast(pixels, (point2_t) {center.x + 80, center.y}, (vec2_t) {dir.x - persp_shift, dir.y}, &cb_draw_light_stop_white);
 
-    uint16_t perp_length_r = raycast(pixels, center, (vec2_t) {-dir.y, dir.x}, &cb_draw_light_stop_white);
-    uint16_t perp_length_l = raycast(pixels, center, (vec2_t) {dir.y, -dir.x}, &cb_draw_light_stop_white);
+    uint16_t parallel = raycast(pixels, centers[0], (vec2_t) {centers[3].x - centers[0].x, centers[3].y - centers[0].y}, &cb_draw_light_stop_white);
 
-    static const uint8_t max_ray_length = 120;
-    static const uint8_t max_length_hor = 80;
-    static const float min_rc = 4.0f;
-    if (fabs(-dir.y / (float) dir.x) < min_rc || ((perp_length_r + perp_length_l) < 20 )) return 0;
-    //printf("%f, %d %d %d\n", -dir.y / (float) dir.x,left_diagonal, right_diagonal, parallel_dir_length);
-    return (((left_diagonal + right_diagonal) > max_ray_length) && 
-            ((left_horizontal + right_horizontal) < max_length_hor) &&
-            (parallel_dir_length > max_ray_length)) ||
-            (((left_diagonal + right_diagonal) < 90) && ((left_diagonal < 40) || (right_diagonal < 40)) && (parallel_dir_length > max_ray_length));
+    uint8_t first_check = (ray_ll > 2) && (ray_lc > 2) && (ray_rc > 2) && (ray_rr > 2);
+    uint8_t secnd_check = ((ray_ll + ray_lc + ray_rc + ray_rr) / 4) <  finish_length;
+    uint8_t third_check = parallel > (ray_lc + ray_rc); 
+    return first_check && (secnd_check || third_check); 
 }
 
 /**
@@ -381,13 +380,13 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     for (height = HEIGHT, i = 0; (height > step) && (straight > (height_limit * step)) && i < MAX_CENTERS; height -= step, i++) {
         straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white) : straight;
 
-//        if (straight <= (height_limit * step)) {
+//        if ((i > 0) && (straight <= (height_limit * step))) {
 //            if (left_diagonal > (height_limit * right_diagonal)) {
 //                centers[i - 1].x -= (TCO_FRAME_WIDTH / 4);
 //           } else if (right_diagonal > (height_limit * left_diagonal)) {
 //                centers[i - 1].x += (TCO_FRAME_WIDTH / 4);
 //            }
-//            straight = i > 0 ? raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white) : straight;
+//            straight = raycast(pixels, centers[i - 1], (vec2_t) {0,-1}, &cb_draw_no_stop_white);
 //        }
 
         center_track = centers[i] = i != 0 ? track_center(pixels, height, centers[i - 1].x) : track_center(pixels, height, centers[0].x);
@@ -418,7 +417,7 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
 
     uint16_t parallel_dir_length = raycast(pixels, base, parallel_dir, &cb_draw_no_stop_white);
 
-    if (i > 5 && finish_condition(pixels, center_track, parallel_dir, parallel_dir_length, left_diagonal, right_diagonal, left_horizontal, right_horizontal)) is_finished = 1;
+    if (i > 5 && finish_condition(pixels, centers[0], parallel_dir)) is_finished = 1;
     if (is_finished) draw_q_number(1, (point2_t) {10,40}, 4);
     else draw_q_number(0, (point2_t) {10,40}, 4);
 

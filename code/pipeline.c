@@ -23,7 +23,7 @@ static gst_pipeline_t pipeline_display = {NULL, NULL, NULL};
 **/
 static const gchar *pipeline_camera_def =
     "v4l2src device=/dev/video0 !"
-    "video/x-raw,format=YUY2,width=640,height=480,framerate=30/1 !"
+    "video/x-raw,format=YUY2,width=640,height=480,framerate=60/1 !"
     "videocrop top=0 left=0 right=0 bottom=260 !" // 150 350
     "videoconvert n-threads=4 !"
     "videoscale !"

@@ -171,8 +171,8 @@ void pre_proc(uint8_t (*const pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH])
         }
     }
     algo_segment(pixels);
-    morph_primitive(pixels, 0, 1); /* Erode 3x3 */
+//    morph_primitive(pixels, 0, 1); /* Erode 3x3 */
     morph_primitive(pixels, 1, 0); /* Dilate 5x5 */
-    morph_primitive(pixels, 0, 1); /* Erode 3x3 */
-    morph_primitive(pixels, 1, 0); /* Dilate 5x5 */
+//    morph_primitive(pixels, 0, 1); /* Erode 3x3 */
+//    morph_primitive(pixels, 1, 0); /* Dilate 5x5 */
 }
