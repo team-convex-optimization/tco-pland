@@ -325,19 +325,22 @@ float sigmoid_straight(float x) {
 
 /**
  * @brief Check if the car is facing a finish line. Only call when there is a possible finish line detected
- * If the top and down raycasts are of similar length and the middle raycast is twice as long, then there is a finish line.
+ * If the slope of the parralel is close to 90 degrees, check if there is a finish line.
  * @param pixels is passed as a ptr
  * @return int > 0 if there is a finish
  */
-int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t center, vec2_t dir) {
-    static const float min_rc = 5.0f;
+int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point2_t center, vec2_t dir, uint16_t left_d, uint16_t right_d, uint16_t avg) {
+    static const float min_rc = 3.0f;
     static const uint8_t persp_shift = 25;
     static const uint8_t finish_length = 60;
+    static const uint8_t intersect_diff = 50;
+    static const uint16_t intersection_avg = 450;
     
     if (fabs(-dir.y / (float) dir.x) < min_rc) return 0;
+
     uint16_t perp_length_r = raycast(pixels, center, (vec2_t) {-dir.y, dir.x}, &cb_draw_light_stop_white);  
     uint16_t perp_length_l = raycast(pixels, center, (vec2_t) {dir.y, -dir.x}, &cb_draw_light_stop_white);   
-    
+
     uint16_t ray_ll = raycast(pixels, (point2_t) {center.x - 80, center.y}, (vec2_t) {dir.x + persp_shift, dir.y}, &cb_draw_light_stop_white);
     uint16_t ray_lc = raycast(pixels, (point2_t) {center.x - 60, center.y}, (vec2_t) {dir.x + persp_shift, dir.y}, &cb_draw_light_stop_white);
     uint16_t ray_rc = raycast(pixels, (point2_t) {center.x + 60, center.y}, (vec2_t) {dir.x - persp_shift, dir.y}, &cb_draw_light_stop_white);
@@ -345,9 +348,10 @@ int finish_condition(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH], point
 
     uint16_t parallel = raycast(pixels, centers[0], (vec2_t) {centers[3].x - centers[0].x, centers[3].y - centers[0].y}, &cb_draw_light_stop_white);
 
-    uint8_t first_check = (ray_ll > 2) && (ray_lc > 2) && (ray_rc > 2) && (ray_rr > 2);
+    // Make sure we're on a straight and not an intersection
+    uint8_t first_check = (ray_ll > 2) && (ray_lc > 2) && (ray_rc > 2) && (ray_rr > 2) && (abs(left_d - right_d) < intersect_diff) && (avg < intersection_avg);
     uint8_t secnd_check = ((ray_ll + ray_lc + ray_rc + ray_rr) / 4) <  finish_length;
-    uint8_t third_check = parallel > (ray_lc + ray_rc); 
+    uint8_t third_check = parallel > (ray_lc + ray_rc);
     return first_check && (secnd_check || third_check); 
 }
 
@@ -364,7 +368,6 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
     uint16_t speed, height = HEIGHT, i = 0, sum_x = 0, sum_y = 0, avg_x = prev_avg;
     uint32_t sum_of_rays = 0;
     static const uint16_t step = 8;
-    static const uint16_t intersection_avg = 450;
     static const uint16_t intersection_sum = 14000;
     static const float height_limit = 1.5f;
     point2_t base;
@@ -400,7 +403,7 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
         sum_y += center_track.y;
         sum_of_rays += ray_left + ray_right;
 
-    }    
+    }
 
     prev_i = (abs(i - prev_i) < 4) ? i : prev_i;
     uint16_t avg_rays =  i > 0 ? sum_of_rays / i : sum_of_rays;
@@ -417,7 +420,7 @@ void calculate_next_position(uint8_t (*pixels)[TCO_FRAME_HEIGHT][TCO_FRAME_WIDTH
 
     uint16_t parallel_dir_length = raycast(pixels, base, parallel_dir, &cb_draw_no_stop_white);
 
-    if (i > 5 && finish_condition(pixels, centers[0], parallel_dir)) is_finished = 1;
+    if (i > 5 && finish_condition(pixels, centers[0], parallel_dir, left_diagonal, right_diagonal, avg_rays)) is_finished = 1;
     if (is_finished) draw_q_number(1, (point2_t) {10,40}, 4);
     else draw_q_number(0, (point2_t) {10,40}, 4);
 
